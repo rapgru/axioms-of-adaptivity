@@ -150,13 +150,13 @@ lemma weighted_sum_bound (hd : BddAbove (Set.range d)) (n : ℕ):
   }
 
   calc ∑ k ∈ (range (n + 1)), q^(n-k) * (d k)^2
-    _ ≤ ∑ k ∈ (range (n + 1)), q^(n-k) * (⨆ i, d i)^2 := by {gcongr; apply h₁}
+    _ ≤ ∑ k ∈ (range (n + 1)), q^(n-k) * (⨆ i, d i)^2 := by gcongr; apply h₁
     _ = ∑ k ∈ (range (n + 1)), (⨆ i, d i)^2 * q^(n-k) := by simp_rw [mul_comm]
     _ = (⨆ i, d i)^2 * ∑ k ∈ range (n + 1), q^(n-k) := by simp [mul_sum]
     _ = (⨆ i, d i)^2 * ∑ k ∈ range (n + 1), q^n/q^k := by rw [h₂]
     _ = (⨆ i, d i)^2 * ∑ k ∈ range (n + 1), q^n * (1/q)^k := by field_simp
     _ = (⨆ i, d i)^2 * q^n * ∑ k ∈ range (n + 1), (1/q)^k := by simp [← mul_sum, mul_assoc]
-    _ = (⨆ i, d i)^2 * (q^n * (1/q^(n+1) - 1)/(1/q - 1)) := by {rw [h₃]; field_simp [mul_assoc]}
+    _ = (⨆ i, d i)^2 * (q^n * (1/q^(n+1) - 1)/(1/q - 1)) := by rw [h₃]; field_simp [mul_assoc]
     _ = (⨆ i, d i)^2 * ((1/q) - q^n)/(1/q - 1) := by rw [h₄, ← mul_div_assoc']
     _ ≤ (⨆ i, d i)^2 * (1/q)/(1/q - 1) := by gcongr
 }
@@ -193,7 +193,7 @@ lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) 
           simp at this
           assumption
       }
-      _ <= K := by {unfold K; apply le_max_left}
+      _ <= K := by unfold K; apply le_max_left
 }
 
 lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (Set.range η)) : limsup (η^2) atTop = 0 := by {
@@ -204,7 +204,7 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
   have hdc : Tendsto (C • d^2) atTop (𝓝 0) := by {
     let f : NNReal → NNReal := fun x ↦ C * x^2
     have hf : Continuous f := by continuity
-    have hf0 : f 0 = 0 := by {unfold f; simp}
+    have hf0 : f 0 = 0 := by unfold f; simp
 
     change Tendsto (f ∘ d) atTop (𝓝 0)
     rw [← hf0]
@@ -254,7 +254,7 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
   }
 
   calc limsup (η^2) atTop
-    _ = limsup (λ n ↦ (η (n+1))^2) atTop := by {rw [← Filter.limsup_nat_add _ 1]; rfl}
+    _ = limsup (λ n ↦ (η (n+1))^2) atTop := by rw [← Filter.limsup_nat_add _ 1]; rfl
     _ = limsup ((η^2) ∘ (· + 1)) atTop := by rfl
     _ ≤ limsup (q • η^2 + C • d^2) atTop := by exact h₁
     _ ≤ limsup (q • η^2) atTop + limsup (C • d^2) atTop := by exact h₂

@@ -20,7 +20,7 @@ lemma lift_bound_below (f : ℕ → NNReal) : BddBelow (Set.range (λ n ↦ ↑(
 }
 
 lemma nnreal_limsup_const_mul {u : ℕ → NNReal} {a : NNReal} (hu: IsBoundedUnder (· ≤ ·) atTop u):
-    Filter.limsup (fun n => a * u n) atTop = a * Filter.limsup u atTop := by {
+    Filter.limsup (fun n ↦ a * u n) atTop = a * Filter.limsup u atTop := by {
   rw [← ENNReal.coe_inj]
   push_cast
   rw [ENNReal.ofNNReal_limsup hu, ENNReal.ofNNReal_limsup]
@@ -42,7 +42,7 @@ lemma smaller_q_eq_zero (a q: NNReal) (hq : q < 1) (ha : a ≤ q*a) : a = 0 := b
   contradiction
 }
 
-lemma monotone_map_bdd_above_range {h : NNReal -> NNReal} {f : ℕ → NNReal} (hh : Monotone h) (hf: BddAbove (Set.range f)) :
+lemma monotone_map_bdd_above_range {h : NNReal → NNReal} {f : ℕ → NNReal} (hh : Monotone h) (hf: BddAbove (Set.range f)) :
     BddAbove (Set.range (h∘f)) := by {
   rw [Set.range_comp]
   exact Monotone.map_bddAbove hh hf
@@ -110,7 +110,7 @@ lemma weighted_sum_bound (hd : BddAbove (Set.range d)) (n : ℕ):
   }
   have hq₂ : (1 / q) ^ (n + 1) ≥ 1 := one_le_pow₀ hq₁
 
-  have h₁ : ∀ k, d k <= (⨆ i, d i) := by {
+  have h₁ : ∀ k, d k ≤ (⨆ i, d i) := by {
     intros k
     exact (le_ciSup_iff' hd).mpr fun b a ↦ a k
   }
@@ -139,7 +139,7 @@ lemma weighted_sum_bound (hd : BddAbove (Set.range d)) (n : ℕ):
   }
 
   have h₅ : (1/q) - q^n ≤ 1/q := by {
-    have : q^n <= 1/q := by {
+    have : q^n ≤ 1/q := by {
       trans 1
       · exact pow_le_one₀ (le_of_lt q_range.1) (le_of_lt q_range.2)
       · exact hq₁
@@ -193,7 +193,7 @@ lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) 
           simp at this
           assumption
       }
-      _ <= K := by unfold K; apply le_max_left
+      _ ≤ K := by unfold K; apply le_max_left
 }
 
 lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (Set.range η)) : limsup (η^2) atTop = 0 := by {
@@ -223,7 +223,7 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
     apply monotone_map_bdd_above_range mul_left_mono hη₂
   }
 
-  have h₁ : limsup ((η^2) ∘ (· + 1)) atTop <= limsup (q • η^2 + C • d^2) atTop := by {
+  have h₁ : limsup ((η^2) ∘ (· + 1)) atTop ≤ limsup (q • η^2 + C • d^2) atTop := by {
     apply Filter.limsup_le_limsup
     · apply Filter.Eventually.of_forall
       intros x

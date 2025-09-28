@@ -30,7 +30,7 @@ lemma uniform_of_uniform_r_linear (h : uniform_r_linear_convergence η) :
         rw [← add_assoc, add_comm l k] at h
         assumption
       }
-      _ = ∑ k ∈ range n, (C * q * (η^2) l) * q^k := by congr with _; ring
+      _ = ∑ k ∈ range n, (C * q * (η^2) l) * q^k := by congr with _; ring_nf
       _ = C * q * (η^2) l * ∑ k ∈ range n, q^k := by rw [← mul_sum]
       _ ≤ C * q * (η^2) l * ∑' k, q^k := by {
         gcongr
@@ -361,5 +361,3 @@ theorem summability_equivalence (hη : ∀ n, η n ≠ 0) :
   tfae_finish
 }
 
-theorem summability_equivalence' :
-  

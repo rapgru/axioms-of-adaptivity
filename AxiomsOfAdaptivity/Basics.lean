@@ -123,13 +123,17 @@ instance Mesh.partialOrder : PartialOrder (Mesh α) where
   le_trans := refines_trans
 
 abbrev RefinementIndicator (α : Type*) (β : Type*) := Mesh α → β → α → ℝ
-def glob_err {β : Type*} (ri: RefinementIndicator α β) (triang: Mesh α) v :=
-  ∑ t ∈ triang, (ri triang v t)^2
-
 variable {β : Type*}
 
+def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=
+  ∑ t ∈ triang, (ri triang v t)^2
+
+-- TOOD maybe move constants to their own structure that is already available before
+-- AdaptiveAlgorithm and only put the Props into the structure
+private noncomputable def ε_qos' (ρ_red C_rel C_red C_stab θ : ℝ) := ⨆ δ > 0, (1-(1+δ)*(1-(1-ρ_red)*θ)) / (C_rel^2 * (C_red + (1+δ⁻¹)*C_stab^2))
+private def C_rel' (C_Δ C_drel : ℝ) := C_Δ * C_drel
+
 -- TODO unify notation for meshes, triangles and vectors (how much special characters to use?)
--- TODO more convenience variables, move glob_err to structure. I can use := just fine here
 structure AdaptiveAlgorithm where
   U : Mesh α → β
   -- limit
@@ -140,6 +144,7 @@ structure AdaptiveAlgorithm where
   -- error measure
   d : Mesh α → β → β → ℝ
   C_Δ : ℝ
+  hC_Δ : 0 < C_Δ
   non_neg : ∀ T v w, d T v w ≥ 0
   quasi_symmetry : ∀ T v w, d T v w ≤ C_Δ * d T w v
   quasi_triangle_ineq : ∀ T v w y, C_Δ⁻¹ * d T v y ≤ d T v w + d T w y
@@ -170,16 +175,63 @@ structure AdaptiveAlgorithm where
   C_red : ℝ
   hC_red : 0 < C_red
   a2 : ∀ T, ∀ T' ≤ T, ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
+  -- A4: reliability
+  C_drel : ℝ
+  hC_drel : 0 < C_drel
+  -- TODO this should be a result from A4 and the compatibility condition of the measure d
+  -- would already be nicer as a sorry theorem
+  reliability : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(glob_err η T (U T))
+  -- A3: general quasi-orthogonality
+  -- this is last so that all constants are already available
+  ε_qo : ℝ
+  hε_qo : 0 ≤ ε_qo ∧ ε_qo < ε_qos' ρ_red (C_rel' C_Δ C_drel) C_red C_stab θ
+  C_qo : ℝ
+  hC_qo : C_qo ≥ 1
+  -- n + 1 is the number of summands here, don't need N ≥ l from paper
+  a3 : ∀ l n, ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 k) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2) ≤ C_qo * glob_err η (𝒯 l) (U <| 𝒯 l)
 
+namespace AdaptiveAlgorithm
+
+variable (alg : @AdaptiveAlgorithm α _ _ β)
+include alg
+
+def ρ_est_fun δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
+noncomputable def C_est_fun δ := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
+
+-- definitions for general field access
+def C_rel := C_rel' alg.C_Δ alg.C_drel
+noncomputable def ε_qoss := ε_qos' alg.ρ_red alg.C_rel alg.C_red alg.C_stab
+
+end AdaptiveAlgorithm
+
+-- TODO make name better so that it is clear this is the η^2 from the paper
 def glob_err_nat (alg : @AdaptiveAlgorithm α _ _ β) l := glob_err alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
+
+omit [DecidableEq α] [Partitionable α] in
+theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
+  apply sum_nonneg
+  exact fun _ _ ↦ sq_nonneg _
+}
+
+theorem glob_err_nat_nonneg (alg : @AdaptiveAlgorithm α _ _ β) :
+  0 ≤ glob_err_nat alg := by {
+    intros l
+    -- example where simp alone does not work without
+    -- specifying a closing theorem to use
+    simpa using glob_err_nonneg _ _ _
+}
+
+theorem C_rel_pos (alg : @AdaptiveAlgorithm α _ _ β): 0 < alg.C_rel := by {
+  exact mul_pos alg.hC_Δ alg.hC_drel
+}
 
 structure EstConst where
   ρ_est : ℝ
   hρ_est : ρ_est ∈ Set.Ioo 0 1
   C_est : ℝ
-  hC_est : C_est > 0
+  hC_est : 0 < C_est
 
-def EstimatorReduction (alg : @AdaptiveAlgorithm α _ _ β) := ∃ c : EstConst, ∀ l, glob_err_nat alg (l + 1) ≤ c.ρ_est * glob_err_nat alg l + c.C_est * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2
+def EstimatorReduction (alg : @AdaptiveAlgorithm α _ _ β) (c : EstConst) δ := c.ρ_est = alg.ρ_est_fun δ ∧ c.C_est = alg.C_est_fun δ ∧ ∀ l, glob_err_nat alg (l + 1) ≤ c.ρ_est * glob_err_nat alg l + c.C_est * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2
 
 -- Start of lemma 4.7
 -- TODO move to file
@@ -239,7 +291,8 @@ lemma doerfler_for_refined_elements (alg : @AdaptiveAlgorithm α _ _ β) :
 }
 
 -- Lemma 4.7
-theorem adaptive_alg_estimator_reduction (alg : @AdaptiveAlgorithm α _ _ β) : EstimatorReduction alg := by {
+theorem adaptive_alg_estimator_reduction (alg : @AdaptiveAlgorithm α _ _ β) : ∃ c δ, EstimatorReduction alg c δ := by {
+  -- TODO this is alg.ρ_est_fun. refactor mono results etc out of here
   let h := fun δ ↦ (1+δ) * (1 - (1-alg.ρ_red) * alg.θ)
   let δ := 1/2 * ((1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹)
 
@@ -302,6 +355,10 @@ theorem adaptive_alg_estimator_reduction (alg : @AdaptiveAlgorithm α _ _ β) : 
       exact le_of_lt hδ
     }
   }
+  use δ
+
+  -- example where refine is a perfect match instead of apply
+  refine ⟨by rfl, by rfl, ?_⟩
 
   intros l
   let summand n t := alg.η (alg.𝒯 n) (alg.U <| alg.𝒯 <| n) t ^ 2

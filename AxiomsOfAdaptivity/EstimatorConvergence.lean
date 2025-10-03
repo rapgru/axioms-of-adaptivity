@@ -1,9 +1,13 @@
 import Mathlib
+import AxiomsOfAdaptivity.Basics
+import AxiomsOfAdaptivity.Summability
+
 open Filter
 open TopologicalSpace
 open BigOperators
 open Finset
 open scoped Topology
+
 
 -- Utils
 lemma nnreal_fun_bbd_below (f : ℕ → NNReal) : BddBelow (Set.range f) := by {
@@ -54,22 +58,20 @@ lemma monotone_map_bdd_above_range {h : NNReal → NNReal} {f : ℕ → NNReal} 
 example : limsup (λ n : NNReal ↦ n) atTop = 0 := by {
   refine NNReal.limsup_of_not_isBoundedUnder ?_
   refine Filter.not_isBoundedUnder_of_tendsto_atTop ?_
-  -- TODO understand what the heck this does
-  exact fun ⦃U⦄ a ↦ a
+  exact fun _ a ↦ a
 }
 
 -- 4.18
-structure EstimatorReduction (η d : ℕ → NNReal) where
+structure SimpleEstimatorReduction (η d : ℕ → NNReal) where
   q : NNReal
   q_range : q ∈ Set.Ioo 0 1
   C : NNReal
   C_pos : C > 0
   bound : ∀ n, (η (n + 1))^2 ≤ q * (η n)^2 + C * (d n)^2
 
--- Theorems about EstimatorReduction
-namespace EstimatorReduction
+namespace SimpleEstimatorReduction
 
-variable {η d : ℕ → NNReal} (h : EstimatorReduction η d)
+variable {η d : ℕ → NNReal} (h : SimpleEstimatorReduction η d)
 include h
 
 def weightedSum (n : ℕ) : NNReal :=
@@ -263,7 +265,7 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
     _ = q * limsup (η^2) atTop := by rfl
 }
 
-theorem convergence_of_estimator (hd_lim : Tendsto d atTop (𝓝 0)) : Tendsto (η^2) atTop (𝓝 0) := by {
+theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Tendsto (η^2) atTop (𝓝 0) := by {
   let hd_above := Tendsto.bddAbove_range hd_lim
   let hη_above := estimator_bounded h hd_above
   have hη2_above : BddAbove (Set.range (η^2)) := by {
@@ -287,4 +289,79 @@ theorem convergence_of_estimator (hd_lim : Tendsto d atTop (𝓝 0)) : Tendsto (
   case h' => exact BddBelow.isBoundedUnder_of_range hη2_below
 }
 
-end EstimatorReduction
+-- TODO real estimator reduction
+end SimpleEstimatorReduction
+
+variable {α β : Type*} [DecidableEq α] [Partitionable α] (alg : @AdaptiveAlgorithm α _ _ β) {c : EstConst} {δ}
+variable (h : EstimatorReduction alg c δ)
+
+
+-- TODO Feischl: Which limit is meant in the a priori convergence and
+-- how does the convergence of this d_seq to zero follow from that?
+def d_seq n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 n)
+
+-- TODO move all theorems about the algorithm into an algorithm namespace so that they
+-- can be accessed with dot notation on the algorithm
+include h in
+theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
+    Tendsto (glob_err_nat alg) atTop (𝓝 0) := by {
+  let η n := NNReal.sqrt (glob_err_nat alg n).toNNReal
+  let d n := (d_seq alg n).toNNReal
+
+  have hη : ∀ n, η n ^ 2 = glob_err_nat alg n := by {
+    intros n
+    unfold η
+    push_cast
+    rw [Real.coe_toNNReal]
+    apply Real.sq_sqrt
+    all_goals exact glob_err_nat_nonneg alg n
+  }
+
+  let est_red := {
+    q := c.ρ_est.toNNReal,
+    C := c.C_est.toNNReal,
+    C_pos := by simpa using c.hC_est
+    q_range := by simpa using c.hρ_est
+    bound := by {
+      unfold EstimatorReduction at h
+
+      have hd : ∀ n, d n = d_seq alg n := by {
+        intros n
+        apply Real.coe_toNNReal
+        apply alg.non_neg
+      }
+
+      -- TODO maybe stuff this into the EstConst structure?
+      have hq : c.ρ_est.toNNReal = c.ρ_est := by {
+        apply Real.coe_toNNReal
+        exact le_of_lt c.hρ_est.1
+      }
+
+      have hC : c.C_est.toNNReal = c.C_est := by {
+        apply Real.coe_toNNReal
+        exact le_of_lt c.hC_est
+      }
+
+      intros n
+      apply NNReal.coe_le_coe.mp
+      push_cast
+
+      simp only [hη, hd, hq, hC]
+      unfold d_seq
+      exact h.2.2 n
+    }
+  : SimpleEstimatorReduction η d}
+
+  have hd_lim : Tendsto d atTop (𝓝 0) := by {
+    rw [Eq.symm Real.toNNReal_zero]
+    apply tendsto_real_toNNReal hd_seq_lim
+  }
+
+  conv =>
+    enter [1, n]
+    rw [← hη n]
+    norm_cast
+  rw [← NNReal.coe_zero]
+  apply NNReal.tendsto_coe.mpr
+  exact est_red.convergence_of_estimator_simple hd_lim
+}

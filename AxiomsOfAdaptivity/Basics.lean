@@ -128,9 +128,70 @@ variable {β : Type*}
 def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=
   ∑ t ∈ triang, (ri triang v t)^2
 
+omit [DecidableEq α] [Partitionable α] in
+theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
+  apply sum_nonneg
+  exact fun _ _ ↦ sq_nonneg _
+}
+
+-- TODO utility, move to file
+lemma square_estimate_of_small_distance {a b c : ℝ} (ha : 0 ≤ a) (h : |a-b| ≤ c) :
+  a^2 ≤ (b+c)^2 := by {
+  have : a - b ≤ c := le_of_max_le_left h
+  have : a ≤ b + c := tsub_le_iff_left.mp this
+  exact pow_le_pow_left₀ ha this 2
+}
+
+example : 2^(1/2) = 1 := rfl
+
+lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 0 < δ) (hpq : p.HolderConjugate q): a*b ≤ δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
+  have hδ₂ := le_of_lt hδ
+  have hpow_nonneg x := (Real.rpow_nonneg hδ₂ x)
+  have ha₂ : 0 ≤ a * δ^(1/p) := mul_nonneg ha (hpow_nonneg _)
+  have hb₂ : 0 ≤ b * 1/δ^(1/p) := by apply mul_nonneg <;> simp [hb, ha, hpow_nonneg _]
+  have := Real.young_inequality_of_nonneg ha₂ hb₂ hpq
+
+  calc a*b
+    _ = a * b * (δ ^ p⁻¹ * (δ ^ p⁻¹)⁻¹) := by field_simp
+    _ = a * δ ^ (1 / p) * (b * 1 / δ ^ (1 / p)) := by ring_nf
+    _ ≤ (a * δ ^ (1 / p)) ^ p / p + (b * 1 / δ ^ (1 / p)) ^ q / q := this
+    _ = δ/p * a^p + (b * 1 / δ ^ (1 / p)) ^ q / q := by {
+      rw [Real.mul_rpow ha <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
+      simp [inv_mul_cancel₀ <| Real.HolderTriple.ne_zero hpq, mul_comm]
+      ring
+    }
+    _ = δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
+      field_simp
+      rw [Real.div_rpow hb <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
+      ring_nf
+    }
+}
+
+lemma sum_square_le_square_sum {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) :
+    ∀ δ > 0, (a+b)^2 ≤ (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by {
+  intros δ hδ
+  have := young_with_delta ha hb hδ Real.HolderConjugate.two_two
+  calc (a + b) ^ 2
+    _ = a^2 + 2*(a*b) + b^2 := by ring
+    _ ≤ a^2 + 2*(δ/2 * a^2 + 1/(2*δ) * b^2) + b^2 := by simpa using this
+    _ = (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by ring
+}
+
+lemma Ioo_01_mul_lt {a b : ℝ} (ha : a < 1) (hb : 0 < b) : a * b < b := by {
+  exact mul_lt_of_lt_one_left hb ha
+}
+
 -- TOOD maybe move constants to their own structure that is already available before
 -- AdaptiveAlgorithm and only put the Props into the structure
+
+/- This indexed supremum (iSup) looks like this after `dsimp [iSup]`, quite clever.
+sSup
+    (Set.range fun δ ↦
+      sSup
+        (Set.range fun h ↦
+          (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)))) -/
 private noncomputable def ε_qos' (ρ_red C_rel C_red C_stab θ : ℝ) := ⨆ δ > 0, (1-(1+δ)*(1-(1-ρ_red)*θ)) / (C_rel^2 * (C_red + (1+δ⁻¹)*C_stab^2))
+
 private def C_rel' (C_Δ C_drel : ℝ) := C_Δ * C_drel
 
 -- TODO unify notation for meshes, triangles and vectors (how much special characters to use?)
@@ -180,40 +241,128 @@ structure AdaptiveAlgorithm where
   hC_drel : 0 < C_drel
   -- TODO this should be a result from A4 and the compatibility condition of the measure d
   -- would already be nicer as a sorry theorem
-  reliability : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(glob_err η T (U T))
+  reliability' : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(glob_err η T (U T))
   -- A3: general quasi-orthogonality
   -- this is last so that all constants are already available
   ε_qo : ℝ
-  hε_qo : 0 ≤ ε_qo ∧ ε_qo < ε_qos' ρ_red (C_rel' C_Δ C_drel) C_red C_stab θ
+  hε_qo' : 0 ≤ ε_qo ∧ ε_qo < ε_qos' ρ_red (C_rel' C_Δ C_drel) C_red C_stab θ
   C_qo : ℝ
   hC_qo : C_qo ≥ 1
   -- n + 1 is the number of summands here, don't need N ≥ l from paper
-  a3 : ∀ l n, ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 k) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2) ≤ C_qo * glob_err η (𝒯 l) (U <| 𝒯 l)
+  a3 : ∀ l n, ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 <| k + l) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2) ≤ C_qo * glob_err η (𝒯 l) (U <| 𝒯 l)
 
 namespace AdaptiveAlgorithm
 
 variable (alg : @AdaptiveAlgorithm α _ _ β)
 include alg
 
-def ρ_est_fun δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
-noncomputable def C_est_fun δ := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
+def ρ_est δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
+noncomputable def C_est δ := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
 
 -- definitions for general field access
 def C_rel := C_rel' alg.C_Δ alg.C_drel
-noncomputable def ε_qoss := ε_qos' alg.ρ_red alg.C_rel alg.C_red alg.C_stab
+noncomputable def ε_qos := ε_qos' alg.ρ_red alg.C_rel alg.C_red alg.C_stab alg.θ
+lemma reliability : ∀ T, alg.d T alg.u (alg.U T) ≤ alg.C_rel * √(glob_err alg.η T (alg.U T)) := alg.reliability'
 
-end AdaptiveAlgorithm
-
--- TODO make name better so that it is clear this is the η^2 from the paper
-def glob_err_nat (alg : @AdaptiveAlgorithm α _ _ β) l := glob_err alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
-
-omit [DecidableEq α] [Partitionable α] in
-theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
-  apply sum_nonneg
-  exact fun _ _ ↦ sq_nonneg _
+lemma hε_qo : 0 ≤ alg.ε_qo ∧ alg.ε_qo < alg.ε_qos := by {
+  exact alg.hε_qo'
 }
 
-theorem glob_err_nat_nonneg (alg : @AdaptiveAlgorithm α _ _ β) :
+lemma hC_rel : 0 < alg.C_rel := Left.mul_pos alg.hC_Δ alg.hC_drel
+
+lemma C_est_pos {δ} (hδ : δ > 0) : 0 < alg.C_est δ := by {
+  apply Left.add_pos_of_pos_of_nonneg alg.hC_red
+  apply mul_nonneg _ (sq_nonneg _)
+  apply add_nonneg (zero_le_one' ℝ)
+  apply inv_nonneg.mpr
+  exact le_of_lt hδ
+}
+
+lemma C_rel_mul_C_est_pos {δ} (hδ : δ > 0) : 0 < alg.C_rel ^ 2 * alg.C_est δ := by {
+  apply mul_pos
+  · exact pow_pos alg.hC_rel 2
+  · exact alg.C_est_pos hδ
+}
+
+-- TODO This is absolutely illlegible
+lemma ε_qo_lt_est_consts : ∃ δ > 0, alg.ε_qo < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) ∧ alg.ρ_est δ < 1 := by {
+  rcases @Real.add_neg_lt_sSup (Set.range fun δ ↦ sSup (Set.range fun (h:δ > 0) ↦ (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)))) (by {
+    apply Set.range_nonempty
+  }) (alg.ε_qo - alg.ε_qos) (sub_neg.mpr alg.hε_qo.2) with ⟨a, ha⟩
+
+  conv at ha =>
+    rhs
+    lhs
+    lhs
+    change alg.ε_qos
+
+  rcases Set.mem_range.mp ha.1 with ⟨δ, hδ⟩
+  use δ
+
+  have : (Set.range fun (h:δ > 0) ↦
+      (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2))) ≠ ∅ := by {
+    by_contra h
+    have : a = 0 := by {
+      rw [← hδ, h]
+      exact Real.sSup_empty
+    }
+    have : ¬ a = 0 := by {
+      apply ne_of_gt
+      linarith [ha.2, alg.hε_qo]
+    }
+    contradiction
+  }
+
+  rcases Set.nonempty_iff_ne_empty.mpr this with ⟨b, hb⟩
+  rcases Set.mem_range.mp hb with ⟨hδ', hbb⟩
+  constructor
+  · exact hδ'
+
+  simp at ha
+
+  have key : alg.ε_qo < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) := by {
+    unfold ρ_est C_est
+    rw [hbb]
+    have : Nonempty (δ > 0) := Nonempty.intro hδ'
+    have : (Set.range fun (h:δ > 0) ↦
+        (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2))) = {(1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2))} := by {
+      apply Set.range_const
+    }
+    have : a = b := by {
+      calc a
+        _ = sSup (Set.range fun h ↦ (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2))) := by {
+          rw [hδ]
+        }
+        _ = (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)) := by {
+          rw [this]
+          apply csSup_singleton
+        }
+        _ = b := by {
+          rw [hbb]
+        }
+    }
+    rw [← this]
+    exact ha.2
+  }
+
+  constructor
+  · unfold ρ_est C_est
+    exact key
+  · have : 0 < 1 - alg.ρ_est δ := by {
+      have := by calc 0
+        _ ≤ alg.ε_qo := alg.hε_qo.1
+        _ < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) := key
+
+      refine (div_pos_iff_of_pos_right ?_).mp this
+      exact alg.C_rel_mul_C_est_pos hδ'
+    }
+    linarith
+}
+
+-- TODO make name better so that it is clear this is the η^2 from the paper
+def glob_err_nat l := glob_err alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
+
+theorem glob_err_nat_nonneg :
   0 ≤ glob_err_nat alg := by {
     intros l
     -- example where simp alone does not work without
@@ -221,64 +370,19 @@ theorem glob_err_nat_nonneg (alg : @AdaptiveAlgorithm α _ _ β) :
     simpa using glob_err_nonneg _ _ _
 }
 
-theorem C_rel_pos (alg : @AdaptiveAlgorithm α _ _ β): 0 < alg.C_rel := by {
-  exact mul_pos alg.hC_Δ alg.hC_drel
+-- TODO really rethink the naming and the NNReal vs Real situation
+noncomputable def gη n := NNReal.sqrt (alg.glob_err_nat n).toNNReal
+
+lemma hgη : ∀ n, alg.gη n ^ 2 = alg.glob_err_nat n := by {
+  intros n
+  unfold gη
+  push_cast
+  rw [Real.coe_toNNReal]
+  apply Real.sq_sqrt
+  all_goals exact alg.glob_err_nat_nonneg n
 }
 
-structure EstConst where
-  ρ_est : ℝ
-  hρ_est : ρ_est ∈ Set.Ioo 0 1
-  C_est : ℝ
-  hC_est : 0 < C_est
-
-def EstimatorReduction (alg : @AdaptiveAlgorithm α _ _ β) (c : EstConst) δ := c.ρ_est = alg.ρ_est_fun δ ∧ c.C_est = alg.C_est_fun δ ∧ ∀ l, glob_err_nat alg (l + 1) ≤ c.ρ_est * glob_err_nat alg l + c.C_est * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2
-
--- Start of lemma 4.7
--- TODO move to file
-
-lemma square_estimate_of_small_distance {a b c : ℝ} (ha : 0 ≤ a) (h : |a-b| ≤ c) :
-  a^2 ≤ (b+c)^2 := by {
-  have : a - b ≤ c := le_of_max_le_left h
-  have : a ≤ b + c := tsub_le_iff_left.mp this
-  exact pow_le_pow_left₀ ha this 2
-}
-
-example : 2^(1/2) = 1 := rfl
-
-lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 0 < δ) (hpq : p.HolderConjugate q): a*b ≤ δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
-  have hδ₂ := le_of_lt hδ
-  have hpow_nonneg x := (Real.rpow_nonneg hδ₂ x)
-  have ha₂ : 0 ≤ a * δ^(1/p) := mul_nonneg ha (hpow_nonneg _)
-  have hb₂ : 0 ≤ b * 1/δ^(1/p) := by apply mul_nonneg <;> simp [hb, ha, hpow_nonneg _]
-  have := Real.young_inequality_of_nonneg ha₂ hb₂ hpq
-
-  calc a*b
-    _ = a * b * (δ ^ p⁻¹ * (δ ^ p⁻¹)⁻¹) := by field_simp
-    _ = a * δ ^ (1 / p) * (b * 1 / δ ^ (1 / p)) := by ring_nf
-    _ ≤ (a * δ ^ (1 / p)) ^ p / p + (b * 1 / δ ^ (1 / p)) ^ q / q := this
-    _ = δ/p * a^p + (b * 1 / δ ^ (1 / p)) ^ q / q := by {
-      rw [Real.mul_rpow ha <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
-      simp [inv_mul_cancel₀ <| Real.HolderTriple.ne_zero hpq, mul_comm]
-      ring
-    }
-    _ = δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
-      field_simp
-      rw [Real.div_rpow hb <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
-      ring_nf
-    }
-}
-
-lemma sum_square_le_square_sum {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) :
-    ∀ δ > 0, (a+b)^2 ≤ (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by {
-  intros δ hδ
-  have := young_with_delta ha hb hδ Real.HolderConjugate.two_two
-  calc (a + b) ^ 2
-    _ = a^2 + 2*(a*b) + b^2 := by ring
-    _ ≤ a^2 + 2*(δ/2 * a^2 + 1/(2*δ) * b^2) + b^2 := by simpa using this
-    _ = (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by ring
-}
-
-lemma doerfler_for_refined_elements (alg : @AdaptiveAlgorithm α _ _ β) :
+lemma doerfler_for_refined_elements :
     ∀ l, alg.θ * glob_err_nat alg l ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by {
   intros l
   calc alg.θ * glob_err_nat alg l
@@ -290,77 +394,72 @@ lemma doerfler_for_refined_elements (alg : @AdaptiveAlgorithm α _ _ β) :
     }
 }
 
--- Lemma 4.7
-theorem adaptive_alg_estimator_reduction (alg : @AdaptiveAlgorithm α _ _ β) : ∃ c δ, EstimatorReduction alg c δ := by {
-  -- TODO this is alg.ρ_est_fun. refactor mono results etc out of here
-  let h := fun δ ↦ (1+δ) * (1 - (1-alg.ρ_red) * alg.θ)
+-- ρ_est is linear, positive rate is the key to monotonicity
+lemma ρ_est_pos_rate : 0 < 1 - (1 - alg.ρ_red) * alg.θ := by {
+  field_simp
+  apply mul_lt_one_of_nonneg_of_lt_one_left
+  · simpa using le_of_lt alg.hρ_red.2
+  · simpa using alg.hρ_red.1
+  · exact alg.hθ.2
+}
+
+lemma ρ_est_strict_mono : StrictMono alg.ρ_est := by {
+  intros a b hab
+  unfold AdaptiveAlgorithm.ρ_est
+  have := alg.ρ_est_pos_rate
+  gcongr
+}
+
+lemma ρ_est_pos {δ} (hδ : δ > 0) : 0 < alg.ρ_est δ := by {
+  calc alg.ρ_est δ
+    _ > alg.ρ_est 0 := alg.ρ_est_strict_mono hδ
+    _ > 0 := by {
+      unfold AdaptiveAlgorithm.ρ_est
+      simp [alg.ρ_est_pos_rate]
+    }
+}
+
+lemma estimator_reduction_delta_exists : ∃ δ > 0, alg.ρ_est δ ∈ Set.Ioo 0 1 ∧ 0 < alg.C_est δ := by {
   let δ := 1/2 * ((1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹)
 
-  -- h is linear, positive rate is the key to monotonicity
-  have key : 0 < 1 - (1 - alg.ρ_red) * alg.θ := by {
-    field_simp
-    apply mul_lt_one_of_nonneg_of_lt_one_left
-    · simpa using le_of_lt alg.hρ_red.2
-    · simpa using alg.hρ_red.1
-    · exact alg.hθ.2
-  }
-  have h_mono : StrictMono h := by {
-    intros a b hab
-    unfold h
-    rel [key, hab]
-  }
   -- 2*delta is positive
   have hδ_pre_pos : 0 < (1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹ := by {
-    apply mul_pos _ (inv_pos.mpr key)
+    apply mul_pos _ (inv_pos.mpr alg.ρ_est_pos_rate)
     simp [sub_mul]
     exact mul_lt_of_lt_one_left alg.hθ.1 alg.hρ_red.2
   }
   have hδ : 0 < δ := by {unfold δ; simp [hδ_pre_pos]}
+
+  use δ
+
   -- TODO: when working with Set.Ioo 0 1 so much, maybe it is worth it to add
   -- a type for this interval that has simp theorems for operations that
   -- stay inside the interval. for example 1/2 * x or 1 - x.
 
-  use {
-    ρ_est := h δ
-    hρ_est := by {
-      constructor
-      · calc h δ
-          _ > h 0 := h_mono hδ
-          _ > 0 := by {
-            unfold h
-            simp [key]
-          }
-      · calc h δ
-          _ < h ((1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹) := by {
-            apply h_mono
-            unfold δ
-            -- TODO this might be a good time for the mode where you can cursor around the expression
-            -- giving this long argument to one_mul for it to recognise the right place is
-            -- not very nice
-            rw [one_div, ← one_mul ((1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹)]
-            apply mul_lt_mul two_inv_lt_one <;> simp [hδ_pre_pos]
-          }
-          _ = 1 := by {
-            unfold h
-            rw [add_mul, mul_assoc, inv_mul_cancel₀ <| Ne.symm (ne_of_lt key)]
-            ring
-          }
-    }
-    C_est := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
-    hC_est := by {
-      apply Left.add_pos_of_pos_of_nonneg alg.hC_red
-      apply mul_nonneg _ (sq_nonneg _)
-      apply add_nonneg (zero_le_one' ℝ)
-      apply inv_nonneg.mpr
-      exact le_of_lt hδ
-    }
-  }
-  use δ
-
   -- example where refine is a perfect match instead of apply
-  refine ⟨by rfl, by rfl, ?_⟩
+  refine ⟨hδ, ?ρ_est_range, ?C_est_pos⟩
+  case ρ_est_range =>
+    constructor
+    · exact alg.ρ_est_pos hδ
+    · calc alg.ρ_est δ
+        _ < alg.ρ_est ((1 - alg.ρ_red) * alg.θ * (1 - (1 - alg.ρ_red) * alg.θ)⁻¹) := by {
+          apply alg.ρ_est_strict_mono
+          apply mul_lt_of_lt_one_left hδ_pre_pos
+          simp [two_inv_lt_one]
+        }
+        _ = 1 := by {
+          unfold AdaptiveAlgorithm.ρ_est
+          rw [add_mul, mul_assoc, inv_mul_cancel₀ <| Ne.symm (ne_of_lt alg.ρ_est_pos_rate)]
+          ring
+        }
+  case C_est_pos =>
+    exact alg.C_est_pos hδ
+}
 
-  intros l
+-- Lemma 4.7
+theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glob_err_nat (l + 1) ≤ alg.ρ_est δ * alg.glob_err_nat l + alg.C_est δ * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2 := by {
+  intros δ hδ hρ_est l
+
   let summand n t := alg.η (alg.𝒯 n) (alg.U <| alg.𝒯 <| n) t ^ 2
   let distance n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n) ^ 2
 
@@ -409,8 +508,10 @@ theorem adaptive_alg_estimator_reduction (alg : @AdaptiveAlgorithm α _ _ β) : 
     }
     _ = (1+δ) * (glob_err_nat alg l - (1-alg.ρ_red) * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
     _ ≤ (1+δ) * (glob_err_nat alg l - (1-alg.ρ_red) * (alg.θ * glob_err_nat alg l)) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
-      have h : 0 ≤ 1 - alg.ρ_red := sub_nonneg_of_le <| le_of_lt alg.hρ_red.2
-      rel[doerfler_for_refined_elements alg l, h]
+      have h₁ : 0 ≤ 1 - alg.ρ_red := sub_nonneg_of_le <| le_of_lt alg.hρ_red.2
+      rel[alg.doerfler_for_refined_elements l, h₁]
     }
     _ = (1+δ) * (1 - (1-alg.ρ_red) * alg.θ) * glob_err_nat alg l + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
 }
+
+end AdaptiveAlgorithm

@@ -178,7 +178,7 @@ lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) 
     rw [hn]
     apply le_max_right
   case neg =>
-    have : n-1+1 = n := by rw [tsub_add_eq_add_tsub (pos_of_ne_zero hn), Nat.add_sub_assoc (by simp), Nat.sub_self 1, Nat.add_zero]
+    have : n-1+1 = n := Nat.succ_pred_eq_of_ne_zero hn
     calc (η n)^2
       _ = (η ((n-1)+1))^2 := by rw [this]
       _ ≤ h.upperBound (n-1) := by exact estimator_recursive_upper_bound h (n-1)
@@ -190,10 +190,9 @@ lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) 
         case pos =>
           simp [hη]
         case neg =>
-          have : h.q^n ≤ 1 := by exact pow_le_one' (le_of_lt h.q_range.2) n
+          have : h.q^n ≤ 1 := pow_le_one' (le_of_lt h.q_range.2) n
           rw [← mul_le_mul_right (pos_of_ne_zero hη)] at this
-          simp at this
-          assumption
+          simpa using this
       }
       _ ≤ K := by unfold K; apply le_max_left
 }
@@ -292,9 +291,7 @@ theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Te
 -- TODO real estimator reduction
 end SimpleEstimatorReduction
 
-variable {α β : Type*} [DecidableEq α] [Partitionable α] (alg : @AdaptiveAlgorithm α _ _ β) {c : EstConst} {δ}
-variable (h : EstimatorReduction alg c δ)
-
+variable {α β : Type*} [DecidableEq α] [Partitionable α] (alg : @AdaptiveAlgorithm α _ _ β)
 
 -- TODO Feischl: Which limit is meant in the a priori convergence and
 -- how does the convergence of this d_seq to zero follow from that?
@@ -302,55 +299,50 @@ def d_seq n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| 
 
 -- TODO move all theorems about the algorithm into an algorithm namespace so that they
 -- can be accessed with dot notation on the algorithm
-include h in
 theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
-    Tendsto (glob_err_nat alg) atTop (𝓝 0) := by {
-  let η n := NNReal.sqrt (glob_err_nat alg n).toNNReal
+    Tendsto alg.glob_err_nat atTop (𝓝 0) := by {
+
+  -- first define the object we want to apply the simplified convergence
+  -- theorem to
+  rcases alg.estimator_reduction_delta_exists with ⟨δ, hδ, ⟨hρ_est, hC_est⟩⟩
+
+  let ρ_est := alg.ρ_est δ
+  let C_est := alg.C_est δ
+
+  have estimator_reduction := alg.estimator_reduction δ hδ hρ_est.2
+
   let d n := (d_seq alg n).toNNReal
 
-  have hη : ∀ n, η n ^ 2 = glob_err_nat alg n := by {
-    intros n
-    unfold η
-    push_cast
-    rw [Real.coe_toNNReal]
-    apply Real.sq_sqrt
-    all_goals exact glob_err_nat_nonneg alg n
-  }
-
   let est_red := {
-    q := c.ρ_est.toNNReal,
-    C := c.C_est.toNNReal,
-    C_pos := by simpa using c.hC_est
-    q_range := by simpa using c.hρ_est
+    q := ρ_est.toNNReal,
+    C := C_est.toNNReal,
+    C_pos := by simpa using hC_est
+    q_range := by simpa using hρ_est
     bound := by {
-      unfold EstimatorReduction at h
-
-      have hd : ∀ n, d n = d_seq alg n := by {
-        intros n
-        apply Real.coe_toNNReal
-        apply alg.non_neg
-      }
-
-      -- TODO maybe stuff this into the EstConst structure?
-      have hq : c.ρ_est.toNNReal = c.ρ_est := by {
-        apply Real.coe_toNNReal
-        exact le_of_lt c.hρ_est.1
-      }
-
-      have hC : c.C_est.toNNReal = c.C_est := by {
-        apply Real.coe_toNNReal
-        exact le_of_lt c.hC_est
-      }
-
       intros n
       apply NNReal.coe_le_coe.mp
       push_cast
 
-      simp only [hη, hd, hq, hC]
+      have hd : d n = d_seq alg n := by {
+        apply Real.coe_toNNReal
+        apply alg.non_neg
+      }
+
+      have hq : ρ_est.toNNReal = ρ_est := by {
+        apply Real.coe_toNNReal
+        exact le_of_lt hρ_est.1
+      }
+
+      have hC : C_est.toNNReal = C_est := by {
+        apply Real.coe_toNNReal
+        exact le_of_lt hC_est
+      }
+
+      simp only [alg.hgη, hd, hq, hC]
       unfold d_seq
-      exact h.2.2 n
+      exact estimator_reduction n
     }
-  : SimpleEstimatorReduction η d}
+  : SimpleEstimatorReduction alg.gη d}
 
   have hd_lim : Tendsto d atTop (𝓝 0) := by {
     rw [Eq.symm Real.toNNReal_zero]
@@ -359,7 +351,7 @@ theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0
 
   conv =>
     enter [1, n]
-    rw [← hη n]
+    rw [← alg.hgη n]
     norm_cast
   rw [← NNReal.coe_zero]
   apply NNReal.tendsto_coe.mpr

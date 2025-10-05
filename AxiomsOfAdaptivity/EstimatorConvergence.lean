@@ -357,3 +357,230 @@ theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0
   apply NNReal.tendsto_coe.mpr
   exact est_red.convergence_of_estimator_simple hd_lim
 }
+
+lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_rel^2 * alg.C_est δ)) = a := by {
+  apply mul_right_eq_self₀.mpr
+  left
+  apply EuclideanDomain.div_self
+  apply ne_of_gt
+  exact alg.C_rel_mul_C_est_pos hδ
+}
+
+-- Lemma 4.10
+theorem summability : uniform_summability alg.gη := by {
+  rcases alg.ε_qo_lt_est_consts with ⟨δ, hδ, hε_qo, hρ_est⟩
+  -- TODO clean up the lt_est_consts lemma !!
+
+  let v := alg.ε_qo * alg.C_rel^2 * alg.C_est δ
+  have hv₁ : v < 1 - alg.ρ_est δ := by {
+    calc v
+      _ = alg.ε_qo * alg.C_rel^2 * alg.C_est δ := by rfl
+      _ < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) * alg.C_rel^2 * alg.C_est δ := by {
+        gcongr
+        · exact alg.C_est_pos hδ
+        · exact pow_pos alg.hC_rel 2
+      }
+      _ = (1 - alg.ρ_est δ) * (alg.C_rel^2 * alg.C_est δ / (alg.C_rel^2 * alg.C_est δ)) := by {
+        field_simp
+        rw [mul_assoc]
+      }
+      _ = 1 - alg.ρ_est δ := by {
+        exact cancel alg hδ
+      }
+  }
+  have hv₂ : 0 ≤ v := by {
+    simp [v, mul_assoc]
+    apply Left.mul_nonneg alg.hε_qo.1
+    exact le_of_lt <| alg.C_rel_mul_C_est_pos hδ
+  }
+
+  have : ∀ N l:ℕ, ∑ k ∈ range N, alg.glob_err_nat (k + l + 1) ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) := by {
+    intros N l
+    calc ∑ k ∈ range N, alg.glob_err_nat (k + l + 1)
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ * alg.glob_err_nat (k + l) + alg.C_est δ * d_seq alg (k + l)^2) := by {
+        gcongr with k hk
+        exact alg.estimator_reduction δ hδ hρ_est (k+l)
+      }
+      _ = ∑ k ∈ range N, ((alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * (d_seq alg (k + l)^2 - v * (alg.C_est δ)⁻¹ * alg.glob_err_nat (k + l))) := by {
+        congr
+        funext k
+        rw [add_mul, mul_sub]
+        conv in _ - _ =>
+          rhs
+          rw [← mul_assoc]
+          lhs
+          tactic =>
+            calc alg.C_est δ * (v * (alg.C_est δ)⁻¹)
+              _ = (alg.C_est δ * (alg.C_est δ)⁻¹) * v := by ring
+              _ = v := by rw [mul_inv_cancel₀ <| ne_of_gt <| alg.C_est_pos hδ, one_mul]
+
+        ring
+      }
+      _ ≤ ∑ k ∈ range N, ((alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * (d_seq alg (k + l)^2 - v * (alg.C_est δ)⁻¹ * (alg.C_rel⁻¹ * alg.d (alg.𝒯 <| k + l) alg.u (alg.U <| alg.𝒯 <| k + l))^2)) := by {
+        gcongr with k hk
+        · exact le_of_lt <| alg.C_est_pos hδ
+        · refine mul_nonneg hv₂ ?_
+          exact inv_nonneg.mpr <| le_of_lt <| alg.C_est_pos hδ
+        · rw [mul_pow]
+          calc alg.C_rel⁻¹ ^ 2 * alg.d (alg.𝒯 (k + l)) alg.u (alg.U (alg.𝒯 (k + l))) ^ 2
+            _ ≤ alg.C_rel⁻¹ ^ 2 * (alg.C_rel ^ 2 * alg.glob_err_nat (k + l)) := by {
+              have := (sq_le_sq₀ (alg.non_neg _ _ _) ?_).mpr (alg.reliability <| alg.𝒯 <| k + l)
+              swap
+              · apply mul_nonneg
+                · exact le_of_lt <| alg.hC_rel
+                · apply Real.sqrt_nonneg
+              simp [mul_pow, Real.sq_sqrt (glob_err_nonneg _ _ _)] at this
+              unfold AdaptiveAlgorithm.glob_err_nat
+              rel [this]
+            }
+            _ = alg.glob_err_nat (k + l) := by {
+              rw [← mul_assoc, ← mul_pow, inv_mul_cancel₀ <| ne_of_gt <| alg.hC_rel]
+              simp
+            }
+      }
+      _ = ∑ k ∈ range N, ((alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * (d_seq alg (k + l)^2 - v / (alg.C_rel^2 * alg.C_est δ) * (alg.d (alg.𝒯 <| k + l) alg.u (alg.U <| alg.𝒯 <| k + l))^2)) := by {
+        field_simp
+        rw [mul_comm]
+      }
+      _ = ∑ k ∈ range N, ((alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * (d_seq alg (k + l)^2 - alg.ε_qo * alg.d (alg.𝒯 <| k + l) alg.u (alg.U <| alg.𝒯 <| k + l)^2)) := by {
+        dsimp [v]
+        rw [mul_assoc, EuclideanDomain.mul_div_assoc, cancel alg hδ]
+        · exact dvd_of_eq rfl
+      }
+      _ = ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * ∑ k ∈ range N, (d_seq alg (k + l)^2 - alg.ε_qo * alg.d (alg.𝒯 <| k + l) alg.u (alg.U <| alg.𝒯 <| k + l)^2) := by {
+        rw [Finset.sum_add_distrib]
+        conv =>
+          lhs
+          rhs
+          rw [← Finset.mul_sum]
+      }
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) := by {
+        unfold d_seq
+        have := alg.a3 l N
+        apply add_le_add (by simp)
+        rw [mul_assoc]
+        exact (mul_le_mul_left <| alg.C_est_pos hδ).mpr this
+      }
+  }
+
+  have : ∀ N l:ℕ, (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.glob_err_nat (k + l + 1) ≤ (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+    intros N l
+    calc (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.glob_err_nat (k + l + 1)
+      _ = (1-(alg.ρ_est δ + v)) * (∑ k ∈ range N, alg.glob_err_nat (k + l + 1) + alg.glob_err_nat l - alg.glob_err_nat l) := by ring
+      _ = (1-(alg.ρ_est δ + v)) * (∑ k ∈ range (N + 1), alg.glob_err_nat (k + l) - alg.glob_err_nat l) := by {
+        congr
+        rw [Finset.sum_range_succ']
+        conv =>
+          rhs
+          congr
+          · rhs
+            intro k
+            rw [Nat.add_right_comm]
+          · simp
+      }
+      _ = (1-(alg.ρ_est δ + v)) * ∑ k ∈ range (N + 1), alg.glob_err_nat (k + l) - (1-(alg.ρ_est δ + v)) * alg.glob_err_nat l := by ring
+      _ = (1-(alg.ρ_est δ + v)) * (∑ k ∈ range N, alg.glob_err_nat (k + l) + alg.glob_err_nat (N + l)) - (1-(alg.ρ_est δ + v)) * alg.glob_err_nat l := by {
+        rw [Finset.sum_range_succ]
+      }
+      _ ≤ (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.glob_err_nat (k + l) + alg.glob_err_nat (N + l) - (1-(alg.ρ_est δ + v)) * alg.glob_err_nat l := by {
+        rw [mul_add]
+        gcongr
+        apply mul_le_of_le_one_left
+        · exact alg.glob_err_nat_nonneg _
+        · rw [← sub_sub]
+          linarith [hv₁, hv₂, alg.ρ_est_pos hδ]
+      }
+      _ = ∑ k ∈ range N, alg.glob_err_nat (k + l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l) + alg.glob_err_nat (N + l) - alg.glob_err_nat l + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        simp [sub_mul, one_mul, sub_add]
+      }
+      _ = ∑ k ∈ range (N+1), alg.glob_err_nat (k + l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l) - alg.glob_err_nat l + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        rw [Finset.sum_range_succ]
+        ring
+      }
+      _ = ∑ k ∈ range N, alg.glob_err_nat (k + l + 1) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l) + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        -- TODO this is the same as the second step without the factor in front
+        rw [Finset.sum_range_succ']
+        conv =>
+          enter [1,1,1,1]
+          congr
+          · rhs
+            intro k
+            rw [Nat.add_right_comm]
+          · simp
+        ring
+      }
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l) + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        rel [this N l]
+      }
+      _ = alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        rw [Finset.mul_sum]
+        ring
+      }
+      _ = (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+        unfold AdaptiveAlgorithm.glob_err_nat
+        ring
+      }
+  }
+
+  let C := (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v)/(1-(alg.ρ_est δ + v))
+
+  have key : ∀ N l:ℕ, ∑ k ∈ range N, alg.glob_err_nat (k + l + 1) ≤ C * alg.glob_err_nat l := by {
+    intros N l
+    unfold C
+    rw [div_mul_eq_mul_div₀]
+    apply (le_div_iff₀ ?_).mpr
+    · rw [mul_comm]
+      apply this
+    · linarith [hv₁]
+  }
+
+  have summable : Summable alg.glob_err_nat := by {
+    apply (summable_nat_add_iff 1).mp
+    apply summable_of_sum_range_le
+    · intros n
+      apply alg.glob_err_nat_nonneg
+
+    have := fun N ↦ key N 0
+    simpa using this
+  }
+
+  constructor
+  · rw [← NNReal.summable_coe]
+    conv =>
+      arg 1
+      intro n
+      simp
+      rw [alg.hgη n]
+    exact summable
+  · have C_pos : C > 0 := by {
+      refine (lt_div_iff₀' ?_).mpr ?_
+      · linarith [hv₁]
+      · simp only [mul_zero]
+        refine Left.add_pos_of_pos_of_nonneg ?_ hv₂
+        refine add_pos ?_ <| alg.ρ_est_pos hδ
+        apply mul_pos (alg.C_est_pos hδ)
+        linarith [alg.hC_qo]
+    }
+
+    have C_cast : ↑C.toNNReal = C := by {
+      rw [Real.coe_toNNReal]
+      exact le_of_lt C_pos
+    }
+
+    use C.toNNReal
+    refine ⟨Real.toNNReal_pos.mpr C_pos, ?_⟩
+
+    intros l
+    apply NNReal.coe_le_coe.mp
+    push_cast
+    rw [C_cast]
+    simp only [Pi.pow_apply, NNReal.coe_pow, alg.hgη l]
+    conv =>
+      lhs
+      arg 1
+      intro k
+      rw [alg.hgη _]
+    refine Real.tsum_le_of_sum_range_le ?_ fun n ↦ key n l
+    intros n
+    apply alg.glob_err_nat_nonneg
+}

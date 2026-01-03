@@ -509,7 +509,10 @@ theorem summability : uniform_summability alg.gη := by {
           · simp
         ring
       }
-      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l) + alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l) + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.glob_err_nat (k + l)
+        + alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l)
+        - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.glob_err_nat (k + l)
+        + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {
         rel [this N l]
       }
       _ = alg.C_est δ * alg.C_qo * glob_err alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) + (alg.ρ_est δ + v) * alg.glob_err_nat l := by {

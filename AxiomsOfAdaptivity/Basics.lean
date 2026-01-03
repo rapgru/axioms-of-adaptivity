@@ -5,6 +5,7 @@ open BigOperators
 open Finset
 open scoped Topology
 
+-- ANCHOR: Partitionable
 class Partitionable (α : Type _) [DecidableEq α] where
   part : Finset α → α → Prop
   self_part : ∀ t : α, part {t} t
@@ -16,17 +17,24 @@ class Partitionable (α : Type _) [DecidableEq α] where
       p ⊆ m ∧ part p s → p = {s}
   unique_element : ∀ (s t : α),
       part {s} t → t = s
+-- ANCHOR_END: Partitionable
 
 notation:50 ts " ⇒ " t => Partitionable.part ts t
+
+-- ANCHOR: Mesh
 abbrev Mesh (α : Type*) := Finset α
+-- ANCHOR_END: Mesh
 
 variable {α: Type*} [DecidableEq α] [Partitionable α]
 instance Mesh.orderBot : OrderBot (Mesh α) := by
   infer_instance
 
+-- ANCHOR: refines
 def refines (A B : Mesh α) : Prop :=
   ∀ t ∈ B, ∃ ts ⊆ A, ts ⇒ t
+-- ANCHOR_END: refines
 
+-- ANCHOR: refines_trans
 theorem refines_trans (X Y Z : Mesh α) (hxy: refines X Y) (hyz: refines Y Z) :
     refines X Z := by {
   intros t ht
@@ -45,6 +53,7 @@ theorem refines_trans (X Y Z : Mesh α) (hxy: refines X Y) (hyz: refines Y Z) :
   · apply Partitionable.union_part
     exact ⟨fun _ hs ↦ by simp [hs, hf], hU⟩
 }
+-- ANCHOR_END: refines_trans
 
 lemma biunion_is_singleton {α β : Type*} [DecidableEq β] (f : α → Finset β)
       (A : Finset α) (b : β) (h : A.biUnion f = {b}) :

@@ -11,5 +11,10 @@ autoImplicit = false
 name = "mathlib"
 scope = "leanprover-community"
 
+[[require]]
+name = "subverso"
+git = "https://github.com/leanprover/subverso"
+rev = "no-modules"
+
 [[lean_lib]]
 name = "AxiomsOfAdaptivity"

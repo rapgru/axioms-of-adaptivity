@@ -1,12 +1,18 @@
 import Mathlib
 
+-- ANCHOR: alpha
 variable {α: Type*} [Lattice α] [OrderBot α]
+-- ANCHOR_END: alpha
 
+-- ANCHOR: Mesh_Props
 def disjoint (m : Finset α): Prop := Set.Pairwise (m : Set α) Disjoint
 def nobot (m : Finset α) : Prop := ⊥ ∉ m
+-- ANCHOR_END: Mesh_Props
 
+-- ANCHOR: Mesh
 abbrev Mesh (α: Type*) [Lattice α] [OrderBot α] :=
   { x : Finset α // disjoint x ∧ nobot x }
+-- ANCHOR_END: Mesh
 
 theorem disjoint_subset {s t : Finset α} (h : t ⊆ s) (hd : disjoint s) : disjoint t :=
   fun _ hat _ hbt hne => hd (h hat) (h hbt) hne
@@ -14,7 +20,7 @@ theorem disjoint_subset {s t : Finset α} (h : t ⊆ s) (hd : disjoint s) : disj
 theorem nobot_subset {s t : Finset α} (h : t ⊆ s) (hn : nobot s) : nobot t :=
   fun hbot => hn (h hbot)
 
-abbrev singletonMesh [DecidableEq α] (t : α) (ht : t ≠ ⊥) : Mesh α := ⟨{t}, by
+abbrev singletonMesh (t : α) (ht : t ≠ ⊥) : Mesh α := ⟨{t}, by
   constructor
   · unfold disjoint
     simp only [Finset.coe_singleton, Set.pairwise_singleton]
@@ -38,12 +44,16 @@ instance [DecidableEq α]: Inter (Mesh α) := ⟨fun a b => ⟨(a : Finset α) �
 
 def Mesh.card (m : Mesh α) : ℕ := (m : Finset α).card
 
+-- ANCHOR: partitions
 def partitions (T : Mesh α) (t : α) : Prop :=
   Finset.sup T id = t
 infix:50 " ↪ " => partitions
+-- ANCHOR_END: partitions
 
+-- ANCHOR: refines
 def refines (A B : Mesh α) : Prop :=
   ∀ t ∈ B, ∃ M ⊆ A, M ↪ t
+-- ANCHOR_END: refines
 
 -- instance : PartialOrder (Mesh α) where
 --   le := (· ⊆ ·)
@@ -56,13 +66,13 @@ lemma partitions_nonempty {M : Mesh α} {t : α} (ht : t ≠ ⊥) (hM : M ↪ t)
   by_contra h
   have : Finset.sup (M : Finset α) id = ⊥ := by {
     rw [h]
-    simp
+    exact Finset.sup_empty
   }
   rw [hM] at this
   contradiction
 }
 
-theorem refines_trans_contruction [DecidableEq α] {X Y Z : Mesh α} (hxy: refines X Y) (hyz: refines Y Z):
+lemma refines_trans_contruction [DecidableEq α] {X Y Z : Mesh α} (hxy: refines X Y) (hyz: refines Y Z):
   ∀ t ∈ Z, ∃ S,
     ∃ f : (s : α) → s ∈ S → Mesh α, ∃ U : Mesh α,
       (S ↪ t)
@@ -198,7 +208,6 @@ lemma refines_antisymm_subset [DecidableEq α] (A B : Mesh α) (hAB: refines A B
     -- t cannot be bot because meshes do not contain bot
     exact mesh_mem_not_bot htA
   }
-  -- TODO continue here, only things from part -> sup change are left
   have : ∃ (s:α) (h : s ∈ S), (f s h : Finset α) = {t} := by {
     rw [hU] at this
     obtain ⟨s,hs,hsf⟩ :=  biunion_is_singleton (S:Finset α).attach this
@@ -246,3 +255,21 @@ instance Mesh.partialOrder [DecidableEq α]: PartialOrder (Mesh α) where
       simp only [Finset.sup_singleton, id_eq]
   }
   le_trans := refines_trans
+
+-- ANCHOR: Mesh_Set_Example
+def real_line_singleton_mesh : Mesh (Set ℝ) :=
+  singletonMesh Set.univ (by
+    simp only [
+      Set.bot_eq_empty,
+      ne_eq,
+      Set.univ_eq_empty_iff,
+      not_isEmpty_of_nonempty,
+      not_false_eq_true
+    ]
+  )
+-- ANCHOR_END: Mesh_Set_Example
+
+-- ANCHOR: Mesh_Classical
+open Classical
+noncomputable def example_union := real_line_singleton_mesh ∩ real_line_singleton_mesh
+-- ANCHOR_END: Mesh_Classical

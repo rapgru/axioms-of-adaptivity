@@ -1,143 +1,20 @@
 import Mathlib
+import AxiomsOfAdaptivity.Mesh
+
 open Filter
 open TopologicalSpace
 open BigOperators
 open Finset
 open scoped Topology
 
--- ANCHOR: Partitionable
-class Partitionable (α : Type _) [DecidableEq α] where
-  part : Finset α → α → Prop
-  self_part : ∀ t : α, part {t} t
-  union_part :
-    ∀ {s : α} (m : Finset α) (ms : α → Finset α),
-      (∀ t ∈ m, part (ms t) t) ∧ part m s → part (m.biUnion ms) s
-  unique_part :
-    ∀ {s : α} (p m : Finset α),
-      p ⊆ m ∧ part p s → p = {s}
-  unique_element : ∀ (s t : α),
-      part {s} t → t = s
--- ANCHOR_END: Partitionable
+variable {α: Type*} [DecidableEq α] [Lattice α] [OrderBot α]
 
-notation:50 ts " ⇒ " t => Partitionable.part ts t
-
--- ANCHOR: Mesh
-abbrev Mesh (α : Type*) := Finset α
--- ANCHOR_END: Mesh
-
-variable {α: Type*} [DecidableEq α] [Partitionable α]
-instance Mesh.orderBot : OrderBot (Mesh α) := by
-  infer_instance
-
--- ANCHOR: refines
-def refines (A B : Mesh α) : Prop :=
-  ∀ t ∈ B, ∃ ts ⊆ A, ts ⇒ t
--- ANCHOR_END: refines
-
--- ANCHOR: refines_trans
-theorem refines_trans (X Y Z : Mesh α) (hxy: refines X Y) (hyz: refines Y Z) :
-    refines X Z := by {
-  intros t ht
-  rcases hyz t ht with ⟨S,hS,hU⟩
-  choose f hf using fun t ht => hxy t (hS ht)
-
-  -- trick: use empty set when element is not in S because biUnion does
-  -- not supply membership proof
-  let U := S.biUnion fun x =>
-    if hx : x ∈ S then f x hx else ∅
-  use U
-
-  constructor
-  · apply Finset.biUnion_subset.mpr
-    exact fun _ hs ↦ by simp [hs, hf]
-  · apply Partitionable.union_part
-    exact ⟨fun _ hs ↦ by simp [hs, hf], hU⟩
-}
--- ANCHOR_END: refines_trans
-
-lemma biunion_is_singleton {α β : Type*} [DecidableEq β] (f : α → Finset β)
-      (A : Finset α) (b : β) (h : A.biUnion f = {b}) :
-      ∃ s ∈ A, f s = {b} := by {
-    have hb : b ∈ A.biUnion f := by simp [h]
-    rcases mem_biUnion.mp hb with ⟨s, hsA, hbs⟩
-    have hsub : f s ⊆ {b} := fun x hx =>
-    by simpa [h] using mem_biUnion.mpr ⟨s, hsA, hx⟩
-    exact ⟨s, hsA, Finset.eq_singleton_iff_unique_mem.mpr
-    ⟨hbs, fun x hx => mem_singleton.1 (hsub hx)⟩⟩
-}
-
-lemma refines_antisymm_subset (A B : Mesh α) (hAB: refines A B) (hBA: refines B A) :
-    A ⊆ B := by {
-  intros t htA
-  -- TODO: deduplicate this construction!
-  obtain ⟨ts, hts_part, hts_sub⟩ := hBA t htA
-  choose f hf using fun t ht => hAB t (hts_part ht)
-  let g := fun x =>
-     if hx : x ∈ ts then f x hx else ∅
-  let U := ts.biUnion g
-
-  have h₁: U ⇒ t := by {
-     apply Partitionable.union_part
-     exact ⟨fun _ hs ↦ by unfold g; simp [hs, hf], hts_sub⟩
-  }
-  have h₂: U ⊆ A := by {
-    apply Finset.biUnion_subset.mpr
-    exact fun _ hs ↦ by unfold g; simp [hs, hf]
-  }
-  have : U = {t} := Partitionable.unique_part U A ⟨h₂, h₁⟩
-  have : ∃ (s:α) (h : s ∈ ts), f s h = {t} := by {
-    obtain ⟨s,hs,hsf⟩ :=  biunion_is_singleton g ts t this
-    use s, hs
-    unfold g at hsf
-    simp [hs] at hsf
-    simp [hsf]
-  }
-  rcases this with ⟨s, hs, hss⟩
-  have : s = t := Partitionable.unique_element t s (by {
-    simp [← hss, (hf s hs).2]
-  })
-  subst this
-  apply hts_part
-  exact hs
-}
-
-theorem refines_antisymm (A B : Mesh α) (hAB: refines A B) (hBA: refines B A) :
-    A = B := by {
-  apply Subset.antisymm_iff.mpr
-  exact ⟨refines_antisymm_subset A B hAB hBA, refines_antisymm_subset B A hBA hAB⟩
-}
-
-instance : LE (Mesh α) := ⟨refines⟩
-instance : LT (Mesh α) := ⟨fun f g => f ≤ g ∧ f ≠ g⟩
-
-instance Mesh.partialOrder : PartialOrder (Mesh α) where
-  le := (· ≤ ·)
-  lt := (· < ·)
-  le_antisymm := refines_antisymm
-  lt_iff_le_not_le a b := by
-    constructor
-    · intros h
-      exact ⟨h.1, by
-        by_contra h₂
-        have : a = b ∧ ¬ a = b := ⟨refines_antisymm a b h.1 h₂, h.2⟩
-        exact (and_not_self_iff (a = b)).mp this
-      ⟩
-    · intros h
-      exact ⟨h.1, by
-        by_contra h₂
-        rw [← h₂] at h
-        exact (and_not_self_iff (a ≤ a)).mp h
-      ⟩
-  le_refl _ t h := ⟨{t}, singleton_subset_iff.mpr h, Partitionable.self_part t⟩
-  le_trans := refines_trans
-
-abbrev RefinementIndicator (α : Type*) (β : Type*) := Mesh α → β → α → ℝ
+abbrev RefinementIndicator (α : Type*) [DecidableEq α] [Lattice α] [OrderBot α] (β : Type*) := Mesh α → β → α → ℝ
 variable {β : Type*}
 
 def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=
   ∑ t ∈ triang, (ri triang v t)^2
 
-omit [DecidableEq α] [Partitionable α] in
 theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
   apply sum_nonneg
   exact fun _ _ ↦ sq_nonneg _
@@ -204,7 +81,7 @@ private noncomputable def ε_qos' (ρ_red C_rel C_red C_stab θ : ℝ) := ⨆ δ
 private def C_rel' (C_Δ C_drel : ℝ) := C_Δ * C_drel
 
 -- TODO unify notation for meshes, triangles and vectors (how much special characters to use?)
-structure AdaptiveAlgorithm where
+structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderBot α] where
   U : Mesh α → β
   -- limit
   u : β
@@ -237,14 +114,14 @@ structure AdaptiveAlgorithm where
   -- A1: stability on non-refined element domains
   C_stab : ℝ
   hC_stab : C_stab > 0
-  a1 : ∀ T, ∀ T' ≤ T, ∀ S ⊆ T ∩ T', ∀ v v',
+  a1 : ∀ T : Mesh α, ∀ T' ≤ T, ∀ S ⊆ T ∩ T', ∀ v v',
     |√(∑ t ∈ S, η T' v' t ^ 2) - √(∑ t ∈ S, η T v t ^ 2)| ≤ C_stab * d T' v' v
   -- A2: reduction property on refined elements
   ρ_red : ℝ
   hρ_red : ρ_red ∈ Set.Ioo 0 1
   C_red : ℝ
   hC_red : 0 < C_red
-  a2 : ∀ T, ∀ T' ≤ T, ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
+  a2 : ∀ T : Mesh α, ∀ T' ≤ T, ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
   -- A4: reliability
   C_drel : ℝ
   hC_drel : 0 < C_drel
@@ -262,7 +139,7 @@ structure AdaptiveAlgorithm where
 
 namespace AdaptiveAlgorithm
 
-variable (alg : @AdaptiveAlgorithm α _ _ β)
+variable (alg : AdaptiveAlgorithm α β)
 include alg
 
 def ρ_est δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
@@ -475,8 +352,8 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glo
   calc glob_err_nat alg (l + 1)
     _ = ∑ t ∈ alg.𝒯 (l + 1) \ alg.𝒯 l, summand (l+1) t + ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand (l+1) t := by {
       unfold glob_err_nat glob_err
-      have h_eq : alg.𝒯 (l + 1) = (alg.𝒯 (l + 1) \ alg.𝒯 l) ∪ (alg.𝒯 (l + 1) ∩ alg.𝒯 l) := by {
-        exact Eq.symm (sdiff_union_inter (alg.𝒯 (l + 1)) (alg.𝒯 l))
+      have h_eq : (alg.𝒯 (l + 1)).val = (↑(alg.𝒯 (l + 1)) \ ↑(alg.𝒯 l)) ∪ (↑(alg.𝒯 (l + 1)) ∩ ↑(alg.𝒯 l)) := by {
+        exact Eq.symm (sdiff_union_inter _ _)
       }
       nth_rw 1 [h_eq]
       simp [sum_union (disjoint_sdiff_inter _ _)]
@@ -484,7 +361,7 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glo
     }
     _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t + alg.C_red * distance l + (∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand (l + 1) t) := by rel[alg.a2 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l)]
     _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t + alg.C_red * distance l + ((1 + δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand l t + (1 + δ⁻¹) * (alg.C_stab ^ 2 * distance l)) := by {
-      have := alg.a1 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l) (alg.𝒯 l ∩ alg.𝒯 (l + 1)) (by rfl) (alg.U <| alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l + 1)
+      have := alg.a1 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l) (alg.𝒯 l ∩ alg.𝒯 (l + 1)) (fun _ a ↦ a) (alg.U <| alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l + 1)
       have := square_estimate_of_small_distance (Real.sqrt_nonneg _) this
       have h₁ : 0 ≤ alg.C_stab * alg.d (alg.𝒯 (l + 1)) (alg.U (alg.𝒯 (l + 1))) (alg.U (alg.𝒯 l)) := by {
         apply mul_nonneg (le_of_lt alg.hC_stab)
@@ -500,9 +377,9 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glo
     _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t + (1+δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand l t + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
     _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t + (1+δ) * (glob_err_nat alg l -  ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
       congr
-      have h_eq : alg.𝒯 l = (alg.𝒯 l \ alg.𝒯 (l + 1)) ∪ (alg.𝒯 l ∩ alg.𝒯 (l+1)) := by exact Eq.symm (sdiff_union_inter (alg.𝒯 l) (alg.𝒯 (l + 1)))
+      have h_eq : (alg.𝒯 l).val = (↑(alg.𝒯 l) \ ↑(alg.𝒯 (l + 1))) ∪ (↑(alg.𝒯 l) ∩ ↑(alg.𝒯 (l+1))) := by exact Eq.symm (sdiff_union_inter _ _)
       have h_dis: @Disjoint (Finset α) Finset.partialOrder Finset.instOrderBot (alg.𝒯 l \ alg.𝒯 (l + 1)) (alg.𝒯 l ∩ alg.𝒯 (l+1)) := by {
-        exact disjoint_sdiff_inter (alg.𝒯 l) (alg.𝒯 (l + 1))
+        exact disjoint_sdiff_inter _ _
       }
       unfold glob_err_nat glob_err
       nth_rw 2 [h_eq]

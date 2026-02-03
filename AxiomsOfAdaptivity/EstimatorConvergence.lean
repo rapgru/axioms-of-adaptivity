@@ -291,7 +291,7 @@ theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Te
 -- TODO real estimator reduction
 end SimpleEstimatorReduction
 
-variable {α β : Type*} [DecidableEq α] [Partitionable α] (alg : @AdaptiveAlgorithm α _ _ β)
+variable {α β : Type*} [DecidableEq α] [Lattice α] [OrderBot α] (alg : AdaptiveAlgorithm α β)
 
 -- TODO Feischl: Which limit is meant in the a priori convergence and
 -- how does the convergence of this d_seq to zero follow from that?

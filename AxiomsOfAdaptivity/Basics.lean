@@ -1,5 +1,6 @@
 import Mathlib
 import AxiomsOfAdaptivity.Mesh
+import AxiomsOfAdaptivity.Util
 
 open Filter
 open TopologicalSpace
@@ -18,53 +19,6 @@ def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=
 theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
   apply sum_nonneg
   exact fun _ _ ↦ sq_nonneg _
-}
-
--- TODO utility, move to file
-lemma square_estimate_of_small_distance {a b c : ℝ} (ha : 0 ≤ a) (h : |a-b| ≤ c) :
-  a^2 ≤ (b+c)^2 := by {
-  have : a - b ≤ c := le_of_max_le_left h
-  have : a ≤ b + c := tsub_le_iff_left.mp this
-  exact pow_le_pow_left₀ ha this 2
-}
-
-example : 2^(1/2) = 1 := rfl
-
-lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 0 < δ) (hpq : p.HolderConjugate q): a*b ≤ δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
-  have hδ₂ := le_of_lt hδ
-  have hpow_nonneg x := (Real.rpow_nonneg hδ₂ x)
-  have ha₂ : 0 ≤ a * δ^(1/p) := mul_nonneg ha (hpow_nonneg _)
-  have hb₂ : 0 ≤ b * 1/δ^(1/p) := by apply mul_nonneg <;> simp [hb, ha, hpow_nonneg _]
-  have := Real.young_inequality_of_nonneg ha₂ hb₂ hpq
-
-  calc a*b
-    _ = a * b * (δ ^ p⁻¹ * (δ ^ p⁻¹)⁻¹) := by field_simp
-    _ = a * δ ^ (1 / p) * (b * 1 / δ ^ (1 / p)) := by ring_nf
-    _ ≤ (a * δ ^ (1 / p)) ^ p / p + (b * 1 / δ ^ (1 / p)) ^ q / q := this
-    _ = δ/p * a^p + (b * 1 / δ ^ (1 / p)) ^ q / q := by {
-      rw [Real.mul_rpow ha <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
-      simp [inv_mul_cancel₀ <| Real.HolderTriple.ne_zero hpq, mul_comm]
-      ring
-    }
-    _ = δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
-      field_simp
-      rw [Real.div_rpow hb <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
-      ring_nf
-    }
-}
-
-lemma sum_square_le_square_sum {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) :
-    ∀ δ > 0, (a+b)^2 ≤ (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by {
-  intros δ hδ
-  have := young_with_delta ha hb hδ Real.HolderConjugate.two_two
-  calc (a + b) ^ 2
-    _ = a^2 + 2*(a*b) + b^2 := by ring
-    _ ≤ a^2 + 2*(δ/2 * a^2 + 1/(2*δ) * b^2) + b^2 := by simpa using this
-    _ = (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by ring
-}
-
-lemma Ioo_01_mul_lt {a b : ℝ} (ha : a < 1) (hb : 0 < b) : a * b < b := by {
-  exact mul_lt_of_lt_one_left hb ha
 }
 
 -- TOOD maybe move constants to their own structure that is already available before

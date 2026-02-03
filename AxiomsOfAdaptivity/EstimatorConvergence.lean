@@ -3,12 +3,6 @@ import AxiomsOfAdaptivity.Basics
 import AxiomsOfAdaptivity.Util
 import AxiomsOfAdaptivity.Summability
 
-open Filter
-open TopologicalSpace
-open BigOperators
-open Finset
-open scoped Topology
-
 -- 4.18
 structure SimpleEstimatorReduction (η d : ℕ → NNReal) where
   q : NNReal

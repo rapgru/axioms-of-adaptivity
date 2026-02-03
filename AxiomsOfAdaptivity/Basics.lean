@@ -2,15 +2,12 @@ import Mathlib
 import AxiomsOfAdaptivity.Mesh
 import AxiomsOfAdaptivity.Util
 
-open Filter
-open TopologicalSpace
-open BigOperators
 open Finset
-open scoped Topology
 
 variable {α: Type*} [DecidableEq α] [Lattice α] [OrderBot α]
 
 abbrev RefinementIndicator (α : Type*) [DecidableEq α] [Lattice α] [OrderBot α] (β : Type*) := Mesh α → β → α → ℝ
+
 variable {β : Type*}
 
 def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=

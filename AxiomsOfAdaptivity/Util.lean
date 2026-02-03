@@ -1,10 +1,7 @@
 import Mathlib
 
 open Filter
-open TopologicalSpace
-open BigOperators
 open Finset
-open scoped Topology
 
 lemma square_estimate_of_small_distance {a b c : ℝ} (ha : 0 ≤ a) (h : |a-b| ≤ c) :
   a^2 ≤ (b+c)^2 := by {

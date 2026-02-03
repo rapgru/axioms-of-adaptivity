@@ -1,6 +1,5 @@
 import Mathlib
-open Filter
-open TopologicalSpace
+
 open Finset
 
 def uniform_summability (η : ℕ → NNReal) :=
@@ -360,4 +359,3 @@ theorem summability_equivalence (hη : ∀ n, η n ≠ 0) :
   tfae_have 2 → 3 := uniform_r_linear_of_inverse hη
   tfae_finish
 }
-

@@ -201,6 +201,7 @@ lemma refines_antisymm_subset [DecidableEq α] (A B : Mesh α) (hAB: refines A B
   rcases refines_trans_contruction hAB hBA t htA with
     ⟨S, f, U, hS_part, hS_subset, hf, hU, hU_part, hU_subset⟩
 
+  -- ANCHOR: refines_antisymm_subset_1
   have : (U : Finset α) = {t} := by {
     apply unique_part A U t htA hU_subset _ hU_part
     -- remains to show that U is not empty
@@ -208,6 +209,7 @@ lemma refines_antisymm_subset [DecidableEq α] (A B : Mesh α) (hAB: refines A B
     -- t cannot be bot because meshes do not contain bot
     exact mesh_mem_not_bot htA
   }
+  -- ANCHOR_END: refines_antisymm_subset_1
   have : ∃ (s:α) (h : s ∈ S), (f s h : Finset α) = {t} := by {
     rw [hU] at this
     obtain ⟨s,hs,hsf⟩ :=  biunion_is_singleton (S:Finset α).attach this

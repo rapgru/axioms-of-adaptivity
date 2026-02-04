@@ -6,20 +6,24 @@ open Finset
 
 variable {α: Type*} [DecidableEq α] [Lattice α] [OrderBot α]
 
-abbrev RefinementIndicator (α : Type*) [DecidableEq α] [Lattice α] [OrderBot α] (β : Type*) := Mesh α → β → α → ℝ
+-- ANCHOR: RefinementIndicator
+abbrev RefinementIndicator (α : Type*) [DecidableEq α] [Lattice α] [OrderBot α] (β : Type*) :=
+  Mesh α → β → α → ℝ
+-- ANCHOR_END: RefinementIndicator
 
+-- ANCHOR: beta
 variable {β : Type*}
+-- ANCHOR_END: beta
 
-def glob_err (ri: RefinementIndicator α β) (triang: Mesh α) v :=
+-- ANCHOR: gη2
+def gη2 (ri: RefinementIndicator α β) (triang: Mesh α) v :=
   ∑ t ∈ triang, (ri triang v t)^2
+-- ANCHOR_END: gη2
 
-theorem glob_err_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ glob_err ri triang v := by {
+theorem gη2_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ gη2 ri triang v := by {
   apply sum_nonneg
   exact fun _ _ ↦ sq_nonneg _
 }
-
--- TOOD maybe move constants to their own structure that is already available before
--- AdaptiveAlgorithm and only put the Props into the structure
 
 /- This indexed supremum (iSup) looks like this after `dsimp [iSup]`, quite clever.
 sSup
@@ -28,79 +32,105 @@ sSup
         (Set.range fun h ↦
           (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)))) -/
 private noncomputable def ε_qos' (ρ_red C_rel C_red C_stab θ : ℝ) := ⨆ δ > 0, (1-(1+δ)*(1-(1-ρ_red)*θ)) / (C_rel^2 * (C_red + (1+δ⁻¹)*C_stab^2))
-
 private def C_rel' (C_Δ C_drel : ℝ) := C_Δ * C_drel
 
--- TODO unify notation for meshes, triangles and vectors (how much special characters to use?)
+-- ANCHOR: AdaptiveAlgorithm
 structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderBot α] where
+  -- Numerical solver --
   U : Mesh α → β
-  -- limit
+
+  -- Limit --
   u : β
-  -- error estimator
+
+  -- Refinement indicator --
   η : RefinementIndicator α β
   hη : η ≥ 0
-  -- error measure
+
+  -- Error measure --
   d : Mesh α → β → β → ℝ
   C_Δ : ℝ
   hC_Δ : 0 < C_Δ
   non_neg : ∀ T v w, d T v w ≥ 0
   quasi_symmetry : ∀ T v w, d T v w ≤ C_Δ * d T w v
   quasi_triangle_ineq : ∀ T v w y, C_Δ⁻¹ * d T v y ≤ d T v w + d T w y
-  -- TODO error measure on X ∪ X(T) ?
+  -- Because we assume reliability directly compatibility is not used
   -- compatibility: ∀ T v w, ∀ T' ≤ T, d T' v w = d T v w
   further_approximation : ∀ T, ∀ ε > 0, ∃ T' ≤ T, d T' u (U T') ≤ ε
-  -- Triangulations
+
+  -- Triangulation sequence --
   𝒯 : ℕ → Mesh α
   h𝒯 : ∀ l, 𝒯 (Nat.succ l) ≤ 𝒯 l
-  -- Dörfler marking
+
+  -- Dörfler marking --
   θ : ℝ
   hθ : θ ∈ Set.Ioc 0 1
   ℳ : ℕ → Mesh α
+  -- Equation (2.5)
+  -- Slightly stronger than AoA because it assumes the selected subset is
+  -- of minimal instead of almost minimal cardinality
   hℳ : ∀ l,
-    -- Doerfler marking (2.5)
-    -- TODO this says that the set has minimal cardinality, should be weakened
-    -- to almost minimal cardinality
-    let doerfler triang := θ * glob_err η (𝒯 l) (U <| 𝒯 l) ≤ ∑ t ∈ triang, η (𝒯 l) (U <| 𝒯 l) t ^ 2
-    ℳ l ⊆ (𝒯 l \ 𝒯 (l+1)) ∧ doerfler (ℳ l) ∧ ∀ M' ⊆ 𝒯 l, doerfler M' → (ℳ l).card ≤ M'.card
-  -- A1: stability on non-refined element domains
+    let doerfler M :=
+      θ * gη2 η (𝒯 l) (U <| 𝒯 l) ≤ ∑ t ∈ M, η (𝒯 l) (U <| 𝒯 l) t ^ 2
+    ℳ l ⊆ (𝒯 l \ 𝒯 (l+1))
+    ∧ doerfler (ℳ l)
+    ∧ ∀ M' ⊆ 𝒯 l, doerfler M' → (ℳ l).card ≤ M'.card
+
+  -- A1: stability on non-refined element domains --
   C_stab : ℝ
   hC_stab : C_stab > 0
   a1 : ∀ T : Mesh α, ∀ T' ≤ T, ∀ S ⊆ T ∩ T', ∀ v v',
     |√(∑ t ∈ S, η T' v' t ^ 2) - √(∑ t ∈ S, η T v t ^ 2)| ≤ C_stab * d T' v' v
-  -- A2: reduction property on refined elements
+
+  -- A2: reduction property on refined elements --
   ρ_red : ℝ
   hρ_red : ρ_red ∈ Set.Ioo 0 1
   C_red : ℝ
   hC_red : 0 < C_red
-  a2 : ∀ T : Mesh α, ∀ T' ≤ T, ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
-  -- A4: reliability
+  a2 : ∀ T : Mesh α, ∀ T' ≤ T,
+    ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
+
+  -- A4: reliability --
   C_drel : ℝ
   hC_drel : 0 < C_drel
-  -- TODO this should be a result from A4 and the compatibility condition of the measure d
-  -- would already be nicer as a sorry theorem
-  reliability' : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(glob_err η T (U T))
-  -- A3: general quasi-orthogonality
-  -- this is last so that all constants are already available
+  -- This is a result from A4 and the compatibility condition of the measure d (Lemma 3.4).
+  -- Because this proof is not formalized we assume this result instead of A4.
+  reliability' : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(gη2 η T (U T))
+
+  -- A3: general quasi-orthogonality --
+  -- Comes last so that all constants are already available
   ε_qo : ℝ
   hε_qo' : 0 ≤ ε_qo ∧ ε_qo < ε_qos' ρ_red (C_rel' C_Δ C_drel) C_red C_stab θ
   C_qo : ℝ
   hC_qo : C_qo ≥ 1
-  -- n + 1 is the number of summands here, don't need N ≥ l from paper
-  a3 : ∀ l n, ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 <| k + l) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2) ≤ C_qo * glob_err η (𝒯 l) (U <| 𝒯 l)
+  -- Here n + 1 is the number of summands, we don't need N ≥ l from AoA
+  a3 : ∀ l n,
+    ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 <| k + l) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2)
+    ≤ C_qo * gη2 η (𝒯 l) (U <| 𝒯 l)
+-- ANCHOR_END: AdaptiveAlgorithm
 
 namespace AdaptiveAlgorithm
 
+-- ANCHOR: alg
 variable (alg : AdaptiveAlgorithm α β)
 include alg
+-- ANCHOR_END: alg
 
+-- ANCHOR: lemma47_consts
 def ρ_est δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
 noncomputable def C_est δ := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
+-- ANCHOR_END: lemma47_consts
 
--- definitions for general field access
+-- redefinitions for general field access
 def C_rel := C_rel' alg.C_Δ alg.C_drel
 noncomputable def ε_qos := ε_qos' alg.ρ_red alg.C_rel alg.C_red alg.C_stab alg.θ
-lemma reliability : ∀ T, alg.d T alg.u (alg.U T) ≤ alg.C_rel * √(glob_err alg.η T (alg.U T)) := alg.reliability'
+lemma reliability : ∀ T, alg.d T alg.u (alg.U T) ≤ alg.C_rel * √(gη2 alg.η T (alg.U T)) := alg.reliability'
 
+-- ANCHOR: seq_abbrev
+def gη2_seq l := gη2 alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
+noncomputable def nn_gη_seq n := NNReal.sqrt (alg.gη2_seq n).toNNReal
+-- ANCHOR_END: seq_abbrev
+
+-- lemmas for constants
 lemma hε_qo : 0 ≤ alg.ε_qo ∧ alg.ε_qo < alg.ε_qos := by {
   exact alg.hε_qo'
 }
@@ -196,33 +226,29 @@ lemma ε_qo_lt_est_consts : ∃ δ > 0, alg.ε_qo < (1 - alg.ρ_est δ) / (alg.C
     linarith
 }
 
--- TODO make name better so that it is clear this is the η^2 from the paper
-def glob_err_nat l := glob_err alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
-
-theorem glob_err_nat_nonneg :
-  0 ≤ glob_err_nat alg := by {
+theorem gη2_seq_nonneg :
+  0 ≤ gη2_seq alg := by {
     intros l
     -- example where simp alone does not work without
     -- specifying a closing theorem to use
-    simpa using glob_err_nonneg _ _ _
+    simpa using gη2_nonneg _ _ _
 }
 
--- TODO really rethink the naming and the NNReal vs Real situation
-noncomputable def gη n := NNReal.sqrt (alg.glob_err_nat n).toNNReal
-
-lemma hgη : ∀ n, alg.gη n ^ 2 = alg.glob_err_nat n := by {
+lemma hnn_gη_seq : ∀ n, alg.nn_gη_seq n ^ 2 = alg.gη2_seq n := by {
   intros n
-  unfold gη
+  unfold nn_gη_seq
   push_cast
   rw [Real.coe_toNNReal]
   apply Real.sq_sqrt
-  all_goals exact alg.glob_err_nat_nonneg n
+  all_goals exact alg.gη2_seq_nonneg n
 }
 
+-- ANCHOR: doerfler_for_refined_elements
 lemma doerfler_for_refined_elements :
-    ∀ l, alg.θ * glob_err_nat alg l ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by {
+    ∀ l, alg.θ * gη2_seq alg l
+      ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by {
   intros l
-  calc alg.θ * glob_err_nat alg l
+  calc alg.θ * gη2_seq alg l
     _ ≤ ∑ t ∈ alg.ℳ l, alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by exact (alg.hℳ l).2.1
     _ ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by {
       apply Finset.sum_le_sum_of_subset_of_nonneg
@@ -230,6 +256,7 @@ lemma doerfler_for_refined_elements :
       · exact fun _ _ _ ↦ sq_nonneg _
     }
 }
+-- ANCHOR_END: doerfler_for_refined_elements
 
 -- ρ_est is linear, positive rate is the key to monotonicity
 lemma ρ_est_pos_rate : 0 < 1 - (1 - alg.ρ_red) * alg.θ := by {
@@ -294,15 +321,22 @@ lemma estimator_reduction_delta_exists : ∃ δ > 0, alg.ρ_est δ ∈ Set.Ioo 0
 }
 
 -- Lemma 4.7
-theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glob_err_nat (l + 1) ≤ alg.ρ_est δ * alg.glob_err_nat l + alg.C_est δ * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2 := by {
+theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) →
+    ∀ l, alg.gη2_seq (l + 1)
+         ≤ alg.ρ_est δ * alg.gη2_seq l
+           + alg.C_est δ * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2 := by {
+  -- ANCHOR: estimator_reduction_1
   intros δ hδ hρ_est l
 
   let summand n t := alg.η (alg.𝒯 n) (alg.U <| alg.𝒯 <| n) t ^ 2
   let distance n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n) ^ 2
+  -- ANCHOR_END: estimator_reduction_1
 
-  calc glob_err_nat alg (l + 1)
-    _ = ∑ t ∈ alg.𝒯 (l + 1) \ alg.𝒯 l, summand (l+1) t + ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand (l+1) t := by {
-      unfold glob_err_nat glob_err
+  -- ANCHOR: estimator_reduction_2
+  calc gη2_seq alg (l + 1)
+    _ = ∑ t ∈ alg.𝒯 (l + 1) \ alg.𝒯 l, summand (l+1) t
+        + ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand (l+1) t := by {
+      unfold gη2_seq gη2
       have h_eq : (alg.𝒯 (l + 1)).val = (↑(alg.𝒯 (l + 1)) \ ↑(alg.𝒯 l)) ∪ (↑(alg.𝒯 (l + 1)) ∩ ↑(alg.𝒯 l)) := by {
         exact Eq.symm (sdiff_union_inter _ _)
       }
@@ -310,9 +344,26 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glo
       simp [sum_union (disjoint_sdiff_inter _ _)]
       nth_rw 1 [inter_comm]
     }
-    _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t + alg.C_red * distance l + (∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand (l + 1) t) := by rel[alg.a2 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l)]
-    _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t + alg.C_red * distance l + ((1 + δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand l t + (1 + δ⁻¹) * (alg.C_stab ^ 2 * distance l)) := by {
-      have := alg.a1 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l) (alg.𝒯 l ∩ alg.𝒯 (l + 1)) (fun _ a ↦ a) (alg.U <| alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l + 1)
+    -- ANCHOR_END: estimator_reduction_2
+    -- ANCHOR: estimator_reduction_3
+    _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t
+        + alg.C_red * distance l
+        + (∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand (l + 1) t) := by
+      rel[alg.a2 (alg.𝒯 l) (alg.𝒯 <| l + 1) (alg.h𝒯 l)]
+    -- ANCHOR_END: estimator_reduction_3
+    -- ANCHOR: estimator_reduction_4
+    _ ≤ alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l + 1), summand l t
+        + alg.C_red * distance l
+        + ((1 + δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand l t
+        + (1 + δ⁻¹) * (alg.C_stab ^ 2 * distance l)) := by {
+      have := alg.a1
+        (alg.𝒯 l)
+        (alg.𝒯 <| l + 1)
+        (alg.h𝒯 l)
+        (alg.𝒯 l ∩ alg.𝒯 (l + 1))
+        (fun _ a ↦ a)
+        (alg.U <| alg.𝒯 <| l)
+        (alg.U <| alg.𝒯 <| l + 1)
       have := square_estimate_of_small_distance (Real.sqrt_nonneg _) this
       have h₁ : 0 ≤ alg.C_stab * alg.d (alg.𝒯 (l + 1)) (alg.U (alg.𝒯 (l + 1))) (alg.U (alg.𝒯 l)) := by {
         apply mul_nonneg (le_of_lt alg.hC_stab)
@@ -325,30 +376,48 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) → ∀ l, alg.glo
       rel [this]
       all_goals apply_rules [sum_nonneg', fun _ ↦ sq_nonneg _]
     }
-    _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t + (1+δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand l t + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
-    _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t + (1+δ) * (glob_err_nat alg l -  ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
+    -- ANCHOR_END: estimator_reduction_4
+    -- ANCHOR: estimator_reduction_5
+    _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t
+        + (1+δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l+1), summand l t
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
+    -- ANCHOR_END: estimator_reduction_5
+    -- ANCHOR: estimator_reduction_6
+    _ = alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t
+        + (1+δ) * (gη2_seq alg l -  ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t)
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
       congr
       have h_eq : (alg.𝒯 l).val = (↑(alg.𝒯 l) \ ↑(alg.𝒯 (l + 1))) ∪ (↑(alg.𝒯 l) ∩ ↑(alg.𝒯 (l+1))) := by exact Eq.symm (sdiff_union_inter _ _)
       have h_dis: @Disjoint (Finset α) Finset.partialOrder Finset.instOrderBot (alg.𝒯 l \ alg.𝒯 (l + 1)) (alg.𝒯 l ∩ alg.𝒯 (l+1)) := by {
         exact disjoint_sdiff_inter _ _
       }
-      unfold glob_err_nat glob_err
+      unfold gη2_seq gη2
       nth_rw 2 [h_eq]
       rw [sum_union (disjoint_sdiff_inter _  _)]
       ring
     }
-    _ ≤ (1+δ) * alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t + (1+δ) * (glob_err_nat alg l - ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
+    -- ANCHOR_END: estimator_reduction_6
+    -- ANCHOR: estimator_reduction_7
+    _ ≤ (1+δ) * alg.ρ_red * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t
+        + (1+δ) * (gη2_seq alg l - ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t)
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
       gcongr
       refine (le_mul_iff_one_le_left ?_).mpr ?_
       · exact alg.hρ_red.1
       · linarith
     }
-    _ = (1+δ) * (glob_err_nat alg l - (1-alg.ρ_red) * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
-    _ ≤ (1+δ) * (glob_err_nat alg l - (1-alg.ρ_red) * (alg.θ * glob_err_nat alg l)) + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
+    -- ANCHOR_END: estimator_reduction_7
+    -- ANCHOR: estimator_reduction_8
+    _ = (1+δ) * (gη2_seq alg l - (1-alg.ρ_red) * ∑ t ∈ alg.𝒯 l \ alg.𝒯 (l+1), summand l t)
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
+    _ ≤ (1+δ) * (gη2_seq alg l - (1-alg.ρ_red) * (alg.θ * gη2_seq alg l))
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
       have h₁ : 0 ≤ 1 - alg.ρ_red := sub_nonneg_of_le <| le_of_lt alg.hρ_red.2
       rel[alg.doerfler_for_refined_elements l, h₁]
     }
-    _ = (1+δ) * (1 - (1-alg.ρ_red) * alg.θ) * glob_err_nat alg l + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
+    _ = (1+δ) * (1 - (1-alg.ρ_red) * alg.θ) * gη2_seq alg l
+        + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by ring
+    -- ANCHOR_END: estimator_reduction_8
 }
 
 end AdaptiveAlgorithm

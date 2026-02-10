@@ -14,15 +14,16 @@ example : 2^(1/2) = 1 := rfl
 
 lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 0 < δ) (hpq : p.HolderConjugate q): a*b ≤ δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by {
   have hδ₂ := le_of_lt hδ
-  have hpow_nonneg x := (Real.rpow_nonneg hδ₂ x)
-  have ha₂ : 0 ≤ a * δ^(1/p) := mul_nonneg ha (hpow_nonneg _)
-  have hb₂ : 0 ≤ b * 1/δ^(1/p) := by apply mul_nonneg <;> simp [hb, ha, hpow_nonneg _]
-  have := Real.young_inequality_of_nonneg ha₂ hb₂ hpq
+  have hpow_nonneg := Real.rpow_nonneg hδ₂
 
   calc a*b
     _ = a * b * (δ ^ p⁻¹ * (δ ^ p⁻¹)⁻¹) := by field_simp
     _ = a * δ ^ (1 / p) * (b * 1 / δ ^ (1 / p)) := by ring_nf
-    _ ≤ (a * δ ^ (1 / p)) ^ p / p + (b * 1 / δ ^ (1 / p)) ^ q / q := this
+    _ ≤ (a * δ ^ (1 / p)) ^ p / p + (b * 1 / δ ^ (1 / p)) ^ q / q := by {
+      apply Real.young_inequality_of_nonneg _ _ hpq
+      · exact mul_nonneg ha (hpow_nonneg _)
+      · apply mul_nonneg <;> simp [hb, ha, hpow_nonneg]
+    }
     _ = δ/p * a^p + (b * 1 / δ ^ (1 / p)) ^ q / q := by {
       rw [Real.mul_rpow ha <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
       simp [inv_mul_cancel₀ <| Real.HolderTriple.ne_zero hpq, mul_comm]

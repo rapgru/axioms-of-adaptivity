@@ -8,24 +8,31 @@ open Filter
 open Topology
 
 -- 4.18
+-- ANCHOR: SimpleEstimatorReduction
 structure SimpleEstimatorReduction (η d : ℕ → NNReal) where
   q : NNReal
   q_range : q ∈ Set.Ioo 0 1
   C : NNReal
   C_pos : C > 0
   bound : ∀ n, (η (n + 1))^2 ≤ q * (η n)^2 + C * (d n)^2
+-- ANCHOR_END: SimpleEstimatorReduction
 
+-- ANCHOR: SimpleEstimatorReduction_preamble
 namespace SimpleEstimatorReduction
 
 variable {η d : ℕ → NNReal} (h : SimpleEstimatorReduction η d)
 include h
+-- ANCHOR_END: SimpleEstimatorReduction_preamble
 
+-- ANCHOR: SimpleEstimatorReduction_defs
 def weightedSum (n : ℕ) : NNReal :=
   ∑ k ∈ Finset.range (n + 1), h.q ^ (n - k) * (d k)^2
 
 def upperBound (n : ℕ) : NNReal :=
   h.q ^ (n + 1) * (η 0)^2 + h.C * h.weightedSum n
+-- ANCHOR_END: SimpleEstimatorReduction_defs
 
+-- ANCHOR: estimator_recursive_upper_bound
 lemma estimator_recursive_upper_bound (n : ℕ) :
     (η (n+1))^2 ≤ h.upperBound n := by {
   induction' n with n ih
@@ -36,7 +43,6 @@ lemma estimator_recursive_upper_bound (n : ℕ) :
       _ ≤ h.q * (η (n + 1))^2 + h.C * (d (n + 1))^2 := by apply h.bound
       _ ≤ h.q * h.upperBound n + h.C * (d (n + 1))^2 := by gcongr
       _ = h.upperBound (n+1) := by {
-        -- TODO maybe split this up into smaller chunks
         unfold upperBound weightedSum
         nth_rw 2 [sum_range_succ]
         rw [mul_add, ← mul_assoc, ← pow_succ', ← mul_assoc, mul_comm h.q h.C, mul_assoc, mul_sum, mul_add]
@@ -45,7 +51,9 @@ lemma estimator_recursive_upper_bound (n : ℕ) :
         simp [pow_zero, add_assoc]
       }
 }
+-- ANCHOR_END: estimator_recursive_upper_bound
 
+-- ANCHOR: weighted_sum_bound
 lemma weighted_sum_bound (hd : BddAbove (Set.range d)) (n : ℕ):
     h.weightedSum n ≤ (⨆ i, d i)^2 * (1/h.q) / (1/h.q - 1) := by {
   let ⟨q, q_range, C, C_pos, bound⟩ := h
@@ -108,7 +116,9 @@ lemma weighted_sum_bound (hd : BddAbove (Set.range d)) (n : ℕ):
     _ = (⨆ i, d i)^2 * ((1/q) - q^n)/(1/q - 1) := by rw [h₄, ← mul_div_assoc']
     _ ≤ (⨆ i, d i)^2 * (1/q)/(1/q - 1) := by gcongr
 }
+-- ANCHOR_END: weighted_sum_bound
 
+-- ANCHOR: estimator_bounded
 lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) := by {
   let K := ((η 0)^2 + h.C * ((⨆ i, d i)^2 * (1/h.q)/(1/h.q - 1))) ⊔ ((η 0)^2)
   use NNReal.sqrt K
@@ -142,40 +152,27 @@ lemma estimator_bounded (hd : BddAbove (Set.range d)) : BddAbove (Set.range η) 
       }
       _ ≤ K := by unfold K; apply le_max_left
 }
+-- ANCHOR_END: estimator_bounded
 
-lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (Set.range η)) : limsup (η^2) atTop = 0 := by {
+-- ANCHOR: estimator_limsup_zero
+lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (Set.range η)) :
+    limsup (η^2) atTop = 0 := by {
   let ⟨q, q_range, C, C_pos, bound⟩ := h
 
   apply smaller_q_eq_zero _ q q_range.2
 
   have hdc : Tendsto (C • d^2) atTop (𝓝 0) := by {
-    let f : NNReal → NNReal := fun x ↦ C * x^2
-    have hf : Continuous f := by continuity
-    have hf0 : f 0 = 0 := by unfold f; simp
-
-    change Tendsto (f ∘ d) atTop (𝓝 0)
-    rw [← hf0]
-    exact Tendsto.comp (hf.tendsto 0) hd
+    have := Filter.Tendsto.pow hd 2
+    have := Filter.Tendsto.mul_const C this
+    simpa [mul_comm] using this
   }
 
-  have hη₂ : BddAbove (Set.range (η^2)) := by {
-    let f : NNReal → NNReal := fun x ↦ x^2
-    change BddAbove (Set.range (f ∘ η))
-    apply monotone_map_bdd_above_range (pow_left_mono 2) hη₁
-  }
-
-  have hη₃ : BddAbove (Set.range (q • η^2)) := by {
-    let f : NNReal → NNReal := fun x ↦ q * x
-    change BddAbove (Set.range (f ∘ (η^2)))
-    apply monotone_map_bdd_above_range mul_left_mono hη₂
-  }
+  have hη₂ : BddAbove (Set.range (η^2)) := monotone_map_bdd_above_range (pow_left_mono 2) hη₁
+  have hη₃ : BddAbove (Set.range (q • η^2)) := monotone_map_bdd_above_range mul_left_mono hη₂
 
   have h₁ : limsup ((η^2) ∘ (· + 1)) atTop ≤ limsup (q • η^2 + C • d^2) atTop := by {
     apply Filter.limsup_le_limsup
-    · apply Filter.Eventually.of_forall
-      intros x
-      simp
-      apply (bound x)
+    · exact Filter.Eventually.of_forall bound
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le
       apply BddBelow.isBoundedUnder_of_range
       apply nnreal_fun_bbd_below
@@ -183,11 +180,9 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
       apply BddAbove.range_add hη₃ <| Tendsto.bddAbove_range hdc
   }
 
-  -- TODO: write these anonymous functions with pointwise operations
   have h₂ : limsup (q • η^2 + C • d^2) atTop ≤ limsup (q • η^2) atTop + limsup (C • d^2) atTop := by {
     rw [← NNReal.coe_le_coe]
-    push_cast
-    simp_rw [← NNReal.toReal_limsup]
+    push_cast [← NNReal.toReal_limsup]
 
     apply limsup_add_le ?cη_below ?cη_above ?cd_below ?cd_above
     case cη_below =>
@@ -207,19 +202,15 @@ lemma estimator_limsup_zero (hd : Tendsto d atTop (𝓝 0)) (hη₁ : BddAbove (
     _ ≤ limsup (q • η^2) atTop + limsup (C • d^2) atTop := by exact h₂
     _ = limsup (q • η^2) atTop := by simp [Tendsto.limsup_eq hdc]
     _ = q * limsup (η^2) atTop := by exact nnreal_limsup_const_mul <| BddAbove.isBoundedUnder_of_range hη₂
-    _ = q * limsup (η^2) atTop := by rfl
 }
+-- ANCHOR_END: estimator_limsup_zero
 
+-- ANCHOR: convergence_of_estimator_simple
 theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Tendsto (η^2) atTop (𝓝 0) := by {
   let hd_above := Tendsto.bddAbove_range hd_lim
   let hη_above := estimator_bounded h hd_above
-  have hη2_above : BddAbove (Set.range (η^2)) := by {
-    let f : NNReal → NNReal := fun x ↦ x^2
-    change BddAbove (Set.range (f ∘ η))
-    apply monotone_map_bdd_above_range (pow_left_mono 2)
-    exact hη_above
-  }
-  have hη2_below : BddBelow (Set.range (η^2)) := by exact nnreal_fun_bbd_below _
+  have hη2_above := monotone_map_bdd_above_range (pow_left_mono 2) hη_above
+  have hη2_below : BddBelow (Set.range (η^2)) := nnreal_fun_bbd_below _
   let hη_limsup := estimator_limsup_zero h hd_lim hη_above
 
   apply tendsto_of_liminf_eq_limsup
@@ -233,19 +224,25 @@ theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Te
   case h => exact BddAbove.isBoundedUnder_of_range hη2_above
   case h' => exact BddBelow.isBoundedUnder_of_range hη2_below
 }
+-- ANCHOR_END: convergence_of_estimator_simple
 
 -- TODO real estimator reduction
 end SimpleEstimatorReduction
 
+-- ANCHOR: vars
 variable {α β : Type*} [DecidableEq α] [Lattice α] [OrderBot α] (alg : AdaptiveAlgorithm α β)
+-- ANCHOR_END: vars
 
 -- TODO Feischl: Which limit is meant in the a priori convergence and
 -- how does the convergence of this d_seq to zero follow from that?
+-- ANCHOR: d_seq
 def d_seq n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 n)
+-- ANCHOR_END: d_seq
 
 -- TODO move all theorems about the algorithm into an algorithm namespace so that they
 -- can be accessed with dot notation on the algorithm
-theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
+-- ANCHOR: convergence_of_estimator
+lemma convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
     Tendsto alg.gη2_seq atTop (𝓝 0) := by {
 
   -- first define the object we want to apply the simplified convergence
@@ -303,6 +300,23 @@ theorem convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0
   apply NNReal.tendsto_coe.mpr
   exact est_red.convergence_of_estimator_simple hd_lim
 }
+-- ANCHOR_END: convergence_of_estimator
+
+-- Feischl: how does a priori convergence imply hd_seq_lim, how to do
+-- to convergence in X by reliability?
+-- ANCHOR: convergence_of_apriori
+theorem convergence_of_apriori (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
+  Tendsto (fun n ↦ alg.d (alg.𝒯 <| n) alg.u (alg.U <| alg.𝒯 n)) atTop (𝓝 0) := by {
+    have := Filter.Tendsto.sqrt (convergence_of_estimator alg hd_seq_lim)
+    have := Filter.Tendsto.const_mul alg.C_rel this
+    simp at this
+
+    apply squeeze_zero _ _ this
+    · exact fun _ ↦ by apply alg.non_neg
+    · intros t
+      apply alg.reliability
+}
+-- ANCHOR_END: convergence_of_apriori
 
 lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_rel^2 * alg.C_est δ)) = a := by {
   apply mul_right_eq_self₀.mpr
@@ -312,6 +326,7 @@ lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_re
   exact alg.C_rel_mul_C_est_pos hδ
 }
 
+-- Do this interlaced! Makes sense here, whole lemma is one big theorem
 -- Lemma 4.10
 theorem summability : uniform_summability alg.nn_gη_seq := by {
   rcases alg.ε_qo_lt_est_consts with ⟨δ, hδ, hε_qo, hρ_est⟩

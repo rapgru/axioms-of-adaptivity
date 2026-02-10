@@ -321,11 +321,11 @@ lemma estimator_reduction_delta_exists : ∃ δ > 0, alg.ρ_est δ ∈ Set.Ioo 0
 }
 
 -- Lemma 4.7
+  -- ANCHOR: estimator_reduction_1
 theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) →
     ∀ l, alg.gη2_seq (l + 1)
          ≤ alg.ρ_est δ * alg.gη2_seq l
            + alg.C_est δ * alg.d (alg.𝒯 <| l + 1) (alg.U <| alg.𝒯 <| l+1) (alg.U <| alg.𝒯 <| l) ^ 2 := by {
-  -- ANCHOR: estimator_reduction_1
   intros δ hδ hρ_est l
 
   let summand n t := alg.η (alg.𝒯 n) (alg.U <| alg.𝒯 <| n) t ^ 2
@@ -372,8 +372,10 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) →
       have := le_trans this <| sum_square_le_square_sum (Real.sqrt_nonneg _) h₁ δ hδ
 
       rw [Real.sq_sqrt, Real.sq_sqrt, mul_pow] at this
-      change ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand (l + 1) t ≤ (1 + δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand l t + (1 + δ⁻¹) * (alg.C_stab ^ 2 * distance l) at this
-      rel [this]
+      · change ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand (l + 1) t
+          ≤ (1 + δ) * ∑ t ∈ alg.𝒯 l ∩ alg.𝒯 (l + 1), summand l t
+          + (1 + δ⁻¹) * (alg.C_stab ^ 2 * distance l) at this
+        rel [this]
       all_goals apply_rules [sum_nonneg', fun _ ↦ sq_nonneg _]
     }
     -- ANCHOR_END: estimator_reduction_4
@@ -388,7 +390,7 @@ theorem estimator_reduction : ∀ δ > 0, (alg.ρ_est δ < 1) →
         + (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2) * distance l := by {
       congr
       have h_eq : (alg.𝒯 l).val = (↑(alg.𝒯 l) \ ↑(alg.𝒯 (l + 1))) ∪ (↑(alg.𝒯 l) ∩ ↑(alg.𝒯 (l+1))) := by exact Eq.symm (sdiff_union_inter _ _)
-      have h_dis: @Disjoint (Finset α) Finset.partialOrder Finset.instOrderBot (alg.𝒯 l \ alg.𝒯 (l + 1)) (alg.𝒯 l ∩ alg.𝒯 (l+1)) := by {
+      have h_dis: Disjoint ((alg.𝒯 l : Finset α) \ alg.𝒯 (l + 1)) (alg.𝒯 l ∩ alg.𝒯 (l+1)) := by {
         exact disjoint_sdiff_inter _ _
       }
       unfold gη2_seq gη2

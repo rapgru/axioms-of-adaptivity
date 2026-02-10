@@ -318,6 +318,7 @@ theorem convergence_of_apriori (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0))
 }
 -- ANCHOR_END: convergence_of_apriori
 
+-- ANCHOR: cancel
 lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_rel^2 * alg.C_est δ)) = a := by {
   apply mul_right_eq_self₀.mpr
   left
@@ -325,9 +326,11 @@ lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_re
   apply ne_of_gt
   exact alg.C_rel_mul_C_est_pos hδ
 }
+-- ANCHOR_END: cancel
 
 -- Do this interlaced! Makes sense here, whole lemma is one big theorem
 -- Lemma 4.10
+-- ANCHOR: summability_1
 theorem summability : uniform_summability alg.nn_gη_seq := by {
   rcases alg.ε_qo_lt_est_consts with ⟨δ, hδ, hε_qo, hρ_est⟩
   -- TODO clean up the lt_est_consts lemma !!
@@ -354,11 +357,16 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
     apply Left.mul_nonneg alg.hε_qo.1
     exact le_of_lt <| alg.C_rel_mul_C_est_pos hδ
   }
+-- ANCHOR_END: summability_1
 
-  have : ∀ N l:ℕ, ∑ k ∈ range N, alg.gη2_seq (k + l + 1) ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.gη2_seq (k + l) + alg.C_est δ * alg.C_qo * gη2 alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) := by {
+-- ANCHOR: summability_2
+  have : ∀ N l:ℕ, ∑ k ∈ range N, alg.gη2_seq (k + l + 1)
+      ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.gη2_seq (k + l)
+        + alg.C_est δ * alg.C_qo * alg.gη2_seq l := by {
     intros N l
     calc ∑ k ∈ range N, alg.gη2_seq (k + l + 1)
-      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ * alg.gη2_seq (k + l) + alg.C_est δ * d_seq alg (k + l)^2) := by {
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ * alg.gη2_seq (k + l)
+          + alg.C_est δ * d_seq alg (k + l)^2) := by {
         gcongr with k hk
         exact alg.estimator_reduction δ hδ hρ_est (k+l)
       }
@@ -415,7 +423,7 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
           rhs
           rw [← Finset.mul_sum]
       }
-      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.gη2_seq (k + l) + alg.C_est δ * alg.C_qo * gη2 alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) := by {
+      _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.gη2_seq (k + l) + alg.C_est δ * alg.C_qo * alg.gη2_seq l := by {
         unfold d_seq
         have := alg.a3 l N
         apply add_le_add (by simp)
@@ -423,8 +431,11 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
         exact (mul_le_mul_left <| alg.C_est_pos hδ).mpr this
       }
   }
+-- ANCHOR_END: summability_2
 
-  have : ∀ N l:ℕ, (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.gη2_seq (k + l + 1) ≤ (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.gη2_seq l := by {
+-- ANCHOR: summability_3
+  have : ∀ N l:ℕ, (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.gη2_seq (k + l + 1)
+      ≤ (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.gη2_seq l := by {
     intros N l
     calc (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.gη2_seq (k + l + 1)
       _ = (1-(alg.ρ_est δ + v)) * (∑ k ∈ range N, alg.gη2_seq (k + l + 1) + alg.gη2_seq l - alg.gη2_seq l) := by ring
@@ -439,11 +450,14 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
             rw [Nat.add_right_comm]
           · simp
       }
-      _ = (1-(alg.ρ_est δ + v)) * ∑ k ∈ range (N + 1), alg.gη2_seq (k + l) - (1-(alg.ρ_est δ + v)) * alg.gη2_seq l := by ring
+      _ = (1-(alg.ρ_est δ + v)) * ∑ k ∈ range (N + 1), alg.gη2_seq (k + l)
+          - (1-(alg.ρ_est δ + v)) * alg.gη2_seq l := by ring
       _ = (1-(alg.ρ_est δ + v)) * (∑ k ∈ range N, alg.gη2_seq (k + l) + alg.gη2_seq (N + l)) - (1-(alg.ρ_est δ + v)) * alg.gη2_seq l := by {
         rw [Finset.sum_range_succ]
       }
-      _ ≤ (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.gη2_seq (k + l) + alg.gη2_seq (N + l) - (1-(alg.ρ_est δ + v)) * alg.gη2_seq l := by {
+      _ ≤ (1-(alg.ρ_est δ + v)) * ∑ k ∈ range N, alg.gη2_seq (k + l)
+          + alg.gη2_seq (N + l)
+          - (1-(alg.ρ_est δ + v)) * alg.gη2_seq l := by {
         rw [mul_add]
         gcongr
         apply mul_le_of_le_one_left
@@ -451,15 +465,23 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
         · rw [← sub_sub]
           linarith [hv₁, hv₂, alg.ρ_est_pos hδ]
       }
-      _ = ∑ k ∈ range N, alg.gη2_seq (k + l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l) + alg.gη2_seq (N + l) - alg.gη2_seq l + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
+      _ = ∑ k ∈ range N, alg.gη2_seq (k + l)
+          - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l)
+          + alg.gη2_seq (N + l)
+          - alg.gη2_seq l
+          + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
         simp [sub_mul, one_mul, sub_add]
       }
-      _ = ∑ k ∈ range (N+1), alg.gη2_seq (k + l) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l) - alg.gη2_seq l + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
+      _ = ∑ k ∈ range (N+1), alg.gη2_seq (k + l)
+          - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l)
+          - alg.gη2_seq l
+          + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
         rw [Finset.sum_range_succ]
         ring
       }
-      _ = ∑ k ∈ range N, alg.gη2_seq (k + l + 1) - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l) + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
-        -- TODO this is the same as the second step without the factor in front
+      _ = ∑ k ∈ range N, alg.gη2_seq (k + l + 1)
+          - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l)
+          + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
         rw [Finset.sum_range_succ']
         conv =>
           enter [1,1,1,1]
@@ -471,21 +493,20 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
         ring
       }
       _ ≤ ∑ k ∈ range N, (alg.ρ_est δ + v) * alg.gη2_seq (k + l)
-        + alg.C_est δ * alg.C_qo * gη2 alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l)
-        - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l)
-        + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
+          + alg.C_est δ * alg.C_qo * alg.gη2_seq l
+          - (alg.ρ_est δ + v) * ∑ k ∈ range N, alg.gη2_seq (k + l)
+          + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
         rel [this N l]
       }
-      _ = alg.C_est δ * alg.C_qo * gη2 alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
+      _ = alg.C_est δ * alg.C_qo * alg.gη2_seq l + (alg.ρ_est δ + v) * alg.gη2_seq l := by {
         rw [Finset.mul_sum]
         ring
       }
-      _ = (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.gη2_seq l := by {
-        unfold AdaptiveAlgorithm.gη2_seq
-        ring
-      }
+      _ = (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v) * alg.gη2_seq l := by ring
   }
+-- ANCHOR_END: summability_3
 
+-- ANCHOR: summability_4
   let C := (alg.C_est δ * alg.C_qo + alg.ρ_est δ + v)/(1-(alg.ρ_est δ + v))
 
   have key : ∀ N l:ℕ, ∑ k ∈ range N, alg.gη2_seq (k + l + 1) ≤ C * alg.gη2_seq l := by {
@@ -497,7 +518,9 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
       apply this
     · linarith [hv₁]
   }
+-- ANCHOR_END: summability_4
 
+-- ANCHOR: summability_5
   have summable : Summable alg.gη2_seq := by {
     apply (summable_nat_add_iff 1).mp
     apply summable_of_sum_range_le
@@ -507,7 +530,9 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
     have := fun N ↦ key N 0
     simpa using this
   }
+-- ANCHOR_END: summability_5
 
+-- ANCHOR: summability_6
   constructor
   · rw [← NNReal.summable_coe]
     conv =>
@@ -548,3 +573,4 @@ theorem summability : uniform_summability alg.nn_gη_seq := by {
     intros n
     apply alg.gη2_seq_nonneg
 }
+-- ANCHOR_END: summability_6

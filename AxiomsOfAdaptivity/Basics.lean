@@ -31,21 +31,32 @@ sSup
       sSup
         (Set.range fun h ↦
           (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)))) -/
+-- ANCHOR: AdaptiveAlgorithm_constfuns
 private noncomputable def ε_qos' (ρ_red C_rel C_red C_stab θ : ℝ) := ⨆ δ > 0, (1-(1+δ)*(1-(1-ρ_red)*θ)) / (C_rel^2 * (C_red + (1+δ⁻¹)*C_stab^2))
 private def C_rel' (C_Δ C_drel : ℝ) := C_Δ * C_drel
+-- ANCHOR_END: AdaptiveAlgorithm_constfuns
 
--- ANCHOR: AdaptiveAlgorithm
+-- ANCHOR: AdaptiveAlgorithm_1
 structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderBot α] where
+-- ANCHOR_END: AdaptiveAlgorithm_1
+
+-- ANCHOR: AdaptiveAlgorithm_2
   -- Numerical solver --
   U : Mesh α → β
+-- ANCHOR_END: AdaptiveAlgorithm_2
 
+-- ANCHOR: AdaptiveAlgorithm_3
   -- Limit --
   u : β
+-- ANCHOR_END: AdaptiveAlgorithm_3
 
+-- ANCHOR: AdaptiveAlgorithm_4
   -- Refinement indicator --
   η : RefinementIndicator α β
   hη : η ≥ 0
+-- ANCHOR_END: AdaptiveAlgorithm_4
 
+-- ANCHOR: AdaptiveAlgorithm_5
   -- Error measure --
   d : Mesh α → β → β → ℝ
   C_Δ : ℝ
@@ -53,14 +64,19 @@ structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderB
   non_neg : ∀ T v w, d T v w ≥ 0
   quasi_symmetry : ∀ T v w, d T v w ≤ C_Δ * d T w v
   quasi_triangle_ineq : ∀ T v w y, C_Δ⁻¹ * d T v y ≤ d T v w + d T w y
+-- ANCHOR_END: AdaptiveAlgorithm_5
+
   -- Because we assume reliability directly compatibility is not used
   -- compatibility: ∀ T v w, ∀ T' ≤ T, d T' v w = d T v w
-  further_approximation : ∀ T, ∀ ε > 0, ∃ T' ≤ T, d T' u (U T') ≤ ε
+  -- further_approximation : ∀ T, ∀ ε > 0, ∃ T' ≤ T, d T' u (U T') ≤ ε
 
+-- ANCHOR: AdaptiveAlgorithm_6
   -- Triangulation sequence --
   𝒯 : ℕ → Mesh α
   h𝒯 : ∀ l, 𝒯 (Nat.succ l) ≤ 𝒯 l
+-- ANCHOR_END: AdaptiveAlgorithm_6
 
+-- ANCHOR: AdaptiveAlgorithm_7
   -- Dörfler marking --
   θ : ℝ
   hθ : θ ∈ Set.Ioc 0 1
@@ -74,13 +90,17 @@ structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderB
     ℳ l ⊆ (𝒯 l \ 𝒯 (l+1))
     ∧ doerfler (ℳ l)
     ∧ ∀ M' ⊆ 𝒯 l, doerfler M' → (ℳ l).card ≤ M'.card
+-- ANCHOR_END: AdaptiveAlgorithm_7
 
+-- ANCHOR: AdaptiveAlgorithm_8
   -- A1: stability on non-refined element domains --
   C_stab : ℝ
   hC_stab : C_stab > 0
   a1 : ∀ T : Mesh α, ∀ T' ≤ T, ∀ S ⊆ T ∩ T', ∀ v v',
     |√(∑ t ∈ S, η T' v' t ^ 2) - √(∑ t ∈ S, η T v t ^ 2)| ≤ C_stab * d T' v' v
+-- ANCHOR_END: AdaptiveAlgorithm_8
 
+-- ANCHOR: AdaptiveAlgorithm_9
   -- A2: reduction property on refined elements --
   ρ_red : ℝ
   hρ_red : ρ_red ∈ Set.Ioo 0 1
@@ -88,14 +108,18 @@ structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderB
   hC_red : 0 < C_red
   a2 : ∀ T : Mesh α, ∀ T' ≤ T,
     ∑ t ∈ T' \ T, η T' (U T') t ^ 2 ≤ ρ_red * ∑ t ∈ T \ T', η T (U T) t ^ 2 + C_red * d T' (U T') (U T) ^ 2
+-- ANCHOR_END: AdaptiveAlgorithm_9
 
+-- ANCHOR: AdaptiveAlgorithm_10
   -- A4: reliability --
   C_drel : ℝ
   hC_drel : 0 < C_drel
   -- This is a result from A4 and the compatibility condition of the measure d (Lemma 3.4).
   -- Because this proof is not formalized we assume this result instead of A4.
   reliability' : ∀ T, d T u (U T) ≤ C_rel' C_Δ C_drel * √(gη2 η T (U T))
+-- ANCHOR_END: AdaptiveAlgorithm_10
 
+-- ANCHOR: AdaptiveAlgorithm_11
   -- A3: general quasi-orthogonality --
   -- Comes last so that all constants are already available
   ε_qo : ℝ
@@ -106,7 +130,7 @@ structure AdaptiveAlgorithm (α β: Type*) [DecidableEq α] [Lattice α] [OrderB
   a3 : ∀ l n,
     ∑ k ∈ range n, (d (𝒯 <| k + l + 1) (U <| 𝒯 <| k + l + 1) (U <| 𝒯 <| k + l) ^ 2 - ε_qo * d (𝒯 <| k + l) u (U <| 𝒯 <| k + l) ^ 2)
     ≤ C_qo * gη2 η (𝒯 l) (U <| 𝒯 l)
--- ANCHOR_END: AdaptiveAlgorithm
+-- ANCHOR_END: AdaptiveAlgorithm_11
 
 namespace AdaptiveAlgorithm
 
@@ -152,7 +176,9 @@ lemma C_rel_mul_C_est_pos {δ} (hδ : δ > 0) : 0 < alg.C_rel ^ 2 * alg.C_est δ
 }
 
 -- TODO This is absolutely illlegible
-lemma ε_qo_lt_est_consts : ∃ δ > 0, alg.ε_qo < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) ∧ alg.ρ_est δ < 1 := by {
+lemma ε_qo_lt_est_consts :
+    ∃ δ > 0, alg.ε_qo < (1 - alg.ρ_est δ) / (alg.C_rel^2 * alg.C_est δ) ∧ alg.ρ_est δ < 1 := by {
+
   rcases @Real.add_neg_lt_sSup (Set.range fun δ ↦ sSup (Set.range fun (h:δ > 0) ↦ (1 - (1 + δ) * (1 - (1 - alg.ρ_red) * alg.θ)) / (alg.C_rel ^ 2 * (alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2)))) (by {
     apply Set.range_nonempty
   }) (alg.ε_qo - alg.ε_qos) (sub_neg.mpr alg.hε_qo.2) with ⟨a, ha⟩

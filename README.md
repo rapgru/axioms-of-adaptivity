@@ -1,6 +1,7 @@
-# axioms_of_adaptivity
+# Axioms of Adaptivity Formalization in Lean
 
-For literate programming use: https://github.com/insightmind/LeanInk
-Helpful info on simp and non-closing simps: https://leanprover-community.github.io/extras/simp.html
-Helpful guide: https://github.com/madvorak/lean4-tactics
-Conversion mode: https://lean-lang.org/theorem_proving_in_lean4/The-Conversion-Tactic-Mode/
+This repository contains a partial Lean formalization
+of the AFEM optimality proof given in _Axioms of adaptivity_ by
+_C. Carstensen, M. Feischl, M. Page, D. Praetorius_ ([Link](https://doi.org/10.1016/j.camwa.2013.12.003)).
+
+It is part of my bachelors thesis _Formalizing Optimal Convergence of Adaptive FEM in Lean_.

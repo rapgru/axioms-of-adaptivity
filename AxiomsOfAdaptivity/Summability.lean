@@ -154,6 +154,10 @@ lemma uniform_r_linear_of_uniform (h : uniform_summability a) :
     _ = (1 + C) * (1/(1 + C⁻¹))^k * (a ^ 2) l := by rw [← NNReal.coe_inj]; push_cast; ring
 -- ANCHOR_END: uniform_r_linear_of_uniform
 
+example : (0:ℝ)^(0:ℝ) = 1 := Real.rpow_zero 0
+example : (0:ℝ)^(-(1:ℝ)) = 0 := by simp
+
+-- ANCHOR: inverse_of_uniform_r_linear_1
 lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_convergence a):
     inverse_summability a := by
   rcases h with ⟨q,hq,C,hC,h⟩
@@ -164,7 +168,9 @@ lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_
     simp
     apply NNReal.rpow_lt_one hq.2
     simp [hs]
+-- ANCHOR_END: inverse_of_uniform_r_linear_1
 
+-- ANCHOR: inverse_of_uniform_r_linear_2
   have h_inv : ∀ l, ∀ k:ℕ, (a l)^(-1/s) ≤ C^(1/(2*s)) * q^(k/(2*s)) * a (l+k) ^ (-1/s) := by
     intros l k
     specialize h k l
@@ -184,7 +190,7 @@ lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_
         · rw [← NNReal.rpow_natCast, ← NNReal.rpow_mul (a (l + k))]
           congr
           field_simp
-      _ ≤ a l ^ (-1 / s) * (a (l + k) ^ (-1 / s) * (C * q ^ k * a l ^ 2) ^ (1 / (2 * s))) := by exact h
+      _ ≤ a l ^ (-1 / s) * (a (l + k) ^ (-1 / s) * (C * q ^ k * a l ^ 2) ^ (1 / (2 * s))) := h
       _ = a l ^ (-1 / s) * a (l + k) ^ (-1 / s) * C ^ (1 / (2 * s)) * q ^ (↑k * (1 / (2 * s))) * a l ^ (1 / s) := by
         simp only [NNReal.mul_rpow, ← mul_assoc]
         rw [← NNReal.rpow_natCast, ← NNReal.rpow_natCast]
@@ -196,9 +202,10 @@ lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_
         simp only [← NNReal.rpow_add (ha l)]
         field_simp
         ring
+-- ANCHOR_END: inverse_of_uniform_r_linear_2
 
+-- ANCHOR: inverse_of_uniform_r_linear_3
   intros l
-
   have h_qbound : ∀ p ∈ (Set.Ioo (0:NNReal) 1), ∑ k ∈ range l, p^(l - k) < (1-p)⁻¹ := by
     intros p hp
     calc ∑ k ∈ range l, p^(l - k)
@@ -242,10 +249,11 @@ lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_
         apply NNReal.eq_iff.mp
         exact pow_succ' p k
       _ = p * ∑ k ∈ range l, p^k := by simp only [mul_sum]
-      _ ≤ ∑ k ∈ range l, p^k := by exact mul_le_of_le_one_left' (le_of_lt hp.2)
-      _ < (1 - p)⁻¹ := by exact geom_sum_lt (ne_of_gt hp.1) hp.2 l
+      _ ≤ ∑ k ∈ range l, p^k := mul_le_of_le_one_left' (le_of_lt hp.2)
+      _ < (1 - p)⁻¹ := geom_sum_lt (ne_of_gt hp.1) hp.2 l
+-- ANCHOR_END: inverse_of_uniform_r_linear_3
 
-
+-- ANCHOR: inverse_of_uniform_r_linear_4
   calc ∑ k ∈ range l, a k ^ (-1 / s)
     _ ≤ ∑ k ∈ range l, C ^ (1 / (2 * s)) * q ^ (↑(l - k) / (2 * s)) * a (k + (l - k)) ^ (-1/s) := by
       gcongr with k hk
@@ -277,6 +285,7 @@ lemma inverse_of_uniform_r_linear (ha : ∀ n, a n ≠ 0) (h : uniform_r_linear_
           linarith [hs]
       rel [h_qbound (q^(1/(2*s))) this]
     _ = C ^ (1 / (2 * s)) * (1 - q ^ (1 / (2 * s)))⁻¹ * a l ^ (-1 / s) := by ring
+-- ANCHOR_END: inverse_of_uniform_r_linear_4
 
 lemma inverse_recursive_bound {C:NNReal} {a:ℕ→NNReal} (hC : C > 0) (hBound : ∀ (l : ℕ), ∑ k ∈ range l, a k ≤ C * a l):
     ∀ n l, ∑ k ∈ range l, a k ≤ 1/(1 + C⁻¹)^n *  ∑ k ∈ range (l + n), a k := by
@@ -296,6 +305,7 @@ lemma inverse_recursive_bound {C:NNReal} {a:ℕ→NNReal} (hC : C > 0) (hBound :
     _ = 1/(1+C⁻¹) * (1/(1+C⁻¹)^n * (∑ k ∈ range (l+(n+1)), a k)) := by {congr 4; ring}
     _ = 1/(1 + C⁻¹)^(n+1) * ∑ k ∈ range (l+(n+1)), a k := by simp [pow_add, ← mul_assoc]
 
+-- ANCHOR: uniform_r_linear_of_inverse_1
 lemma uniform_r_linear_of_inverse (ha : ∀ n, a n ≠ 0) (h : inverse_summability a) : uniform_r_linear_convergence a := by
   rcases (h (1/2) (by simp only [one_div, gt_iff_lt, inv_pos, Nat.ofNat_pos])) with ⟨C, hC, hBound⟩
   simp at hBound
@@ -311,6 +321,8 @@ lemma uniform_r_linear_of_inverse (ha : ∀ n, a n ≠ 0) (h : inverse_summabili
   · simp [hC]
 
   intros k l
+-- ANCHOR_END: uniform_r_linear_of_inverse_1
+-- ANCHOR: uniform_r_linear_of_inverse_2
   have h := by
     let g : ℕ → NNReal := fun k ↦ (a k)^(-2:ℝ)
     calc (a l)^(-2:ℝ)
@@ -322,17 +334,16 @@ lemma uniform_r_linear_of_inverse (ha : ∀ n, a n ≠ 0) (h : inverse_summabili
       _ ≤ 1/(1 + C⁻¹)^k * (C * g (l+k) + g (l+k)) := by rel [hBound (l+k)]
       _ = 1/(1 + C⁻¹)^k * (1+C) * g (l+k) := by ring
       _ = 1/(1 + C⁻¹)^k * (1+C) * (a (l+k))^(-2:ℝ) := by rfl
+-- ANCHOR_END: uniform_r_linear_of_inverse_2
 
-  replace h := mul_le_mul_left' h (a l ^ 2)
-  replace h := mul_le_mul_right' h (a (l+k) ^ 2)
-
+-- ANCHOR: uniform_r_linear_of_inverse_3
   calc (a ^ 2) (l + k)
     _ = a (l+k) ^ 2 * ((a l) ^ (-2:ℝ) * (a l) ^ (2:ℝ)) := by
       rw [← NNReal.rpow_add (ha l)]
       simp
     _ = a (l+k) ^ 2 * ((a l) ^ (-2:ℝ) * (a l) ^ 2) := by simp
     _ = a l ^ 2 * a l ^ (-2:ℝ) * a (l + k) ^ 2 := by ring
-    _ ≤ a l ^ 2 * (1 / (1 + C⁻¹) ^ k * (1 + C) * a (l + k) ^ (-2:ℝ)) * a (l + k) ^ 2 := by exact h
+    _ ≤ a l ^ 2 * (1 / (1 + C⁻¹) ^ k * (1 + C) * a (l + k) ^ (-2:ℝ)) * a (l + k) ^ 2 := by rel[h]
     _ = a l ^ 2 * (1 / (1 + C⁻¹) ^ k * (1 + C)) * (a (l + k) ^ (-2:ℝ) * a (l + k) ^ 2) := by ring
     _ = a l ^ 2 * (1 / (1 + C⁻¹) ^ k * (1 + C)) * (a (l + k) ^ (-2:ℝ) * a (l + k) ^ (2:ℝ)) := by simp
     _ = a l ^ 2 * (1 / (1 + C⁻¹) ^ k * (1 + C)) := by
@@ -341,6 +352,7 @@ lemma uniform_r_linear_of_inverse (ha : ∀ n, a n ≠ 0) (h : inverse_summabili
     _ = (1 / (1 + C⁻¹) ^ k * (1 + C)) * (a l) ^ 2 := by ring
     _ = ((1 + C⁻¹)⁻¹ ^ k * (1 + C)) * (a ^ 2) l := by simp
     _ = (1 + C) * (1 + C⁻¹)⁻¹ ^ k * (a ^ 2) l := by ring
+-- ANCHOR_END: uniform_r_linear_of_inverse_3
 
 -- ANCHOR: uniform_of_uniform_r_linear
 theorem summability_equivalence (ha : ∀ n, a n ≠ 0) :

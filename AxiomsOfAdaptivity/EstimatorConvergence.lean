@@ -211,7 +211,6 @@ theorem convergence_of_estimator_simple (hd_lim : Tendsto d atTop (𝓝 0)) : Te
   case h' => exact BddBelow.isBoundedUnder_of_range hη2_below
 -- ANCHOR_END: convergence_of_estimator_simple
 
--- TODO real estimator reduction
 end SimpleEstimatorReduction
 
 -- ANCHOR: vars
@@ -224,8 +223,6 @@ variable {α β : Type*} [DecidableEq α] [Lattice α] [OrderBot α] (alg : Adap
 def d_seq n := alg.d (alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 <| n + 1) (alg.U <| alg.𝒯 n)
 -- ANCHOR_END: d_seq
 
--- TODO move all theorems about the algorithm into an algorithm namespace so that they
--- can be accessed with dot notation on the algorithm
 -- ANCHOR: convergence_of_estimator
 lemma convergence_of_estimator (hd_seq_lim : Tendsto (d_seq alg) atTop (𝓝 0)) :
     Tendsto alg.gη2_seq atTop (𝓝 0) := by
@@ -311,7 +308,6 @@ lemma cancel {δ a} (hδ : δ > 0) : a * (alg.C_rel^2 * alg.C_est δ / (alg.C_re
 -- ANCHOR: summability_1
 theorem summability : uniform_summability alg.nn_gη_seq := by
   rcases alg.ε_qo_lt_est_consts with ⟨δ, hδ, hε_qo, hρ_est⟩
-  -- TODO clean up the lt_est_consts lemma !!
 
   let v := alg.ε_qo * alg.C_rel^2 * alg.C_est δ
   have hv₁ : v < 1 - alg.ρ_est δ := calc

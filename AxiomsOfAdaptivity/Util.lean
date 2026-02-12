@@ -3,14 +3,17 @@ import Mathlib
 open Filter
 open Finset
 
+-- ANCHOR: square_estimate_of_small_distance
 lemma square_estimate_of_small_distance {a b c : ℝ} (ha : 0 ≤ a) (h : |a-b| ≤ c) :
   a^2 ≤ (b+c)^2 := by
   have := le_of_max_le_left h
   have := tsub_le_iff_left.mp this
   exact pow_le_pow_left₀ ha this 2
+-- ANCHOR_END: square_estimate_of_small_distance
 
 example : 2^(1/2) = 1 := rfl
 
+-- ANCHOR: young_with_delta
 lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 0 < δ) (hpq : p.HolderConjugate q): a*b ≤ δ/p * a^p + 1/(q*δ^(q/p)) * b^q := by
   have hδ₂ := le_of_lt hδ
   have hpow_nonneg := Real.rpow_nonneg hδ₂
@@ -30,7 +33,9 @@ lemma young_with_delta {a b δ p q : ℝ} (ha : 0 ≤ a)  (hb : 0 ≤ b) (hδ : 
       field_simp
       rw [Real.div_rpow hb <| hpow_nonneg _, ←Real.rpow_mul hδ₂]
       ring_nf
+-- ANCHOR_END: young_with_delta
 
+-- ANCHOR: sum_square_le_square_sum
 lemma sum_square_le_square_sum {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) :
     ∀ δ > 0, (a+b)^2 ≤ (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by
   intros δ hδ
@@ -39,6 +44,7 @@ lemma sum_square_le_square_sum {a b : ℝ} (ha : 0 ≤ a) (hb : 0 ≤ b) :
     _ = a^2 + 2*(a*b) + b^2 := by ring
     _ ≤ a^2 + 2*(δ/2 * a^2 + 1/(2*δ) * b^2) + b^2 := by simpa using this
     _ = (1+δ)*a^2 + (1+δ⁻¹)*b^2 := by ring
+-- ANCHOR_END: sum_square_le_square_sum
 
 lemma Ioo_01_mul_lt {a b : ℝ} (ha : a < 1) (hb : 0 < b) : a * b < b := mul_lt_of_lt_one_left hb ha
 

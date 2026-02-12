@@ -5,13 +5,13 @@ variable {α: Type*} [Lattice α] [OrderBot α]
 -- ANCHOR_END: alpha
 
 -- ANCHOR: Mesh_Props
-def disjoint (m : Finset α): Prop := Set.Pairwise (m : Set α) Disjoint
-def nobot (m : Finset α) : Prop := ⊥ ∉ m
+def disjoint (𝒯 : Finset α): Prop := Set.Pairwise (𝒯 : Set α) Disjoint
+def nobot (𝒯 : Finset α) : Prop := ⊥ ∉ 𝒯
 -- ANCHOR_END: Mesh_Props
 
 -- ANCHOR: Mesh
 abbrev Mesh (α: Type*) [Lattice α] [OrderBot α] :=
-  { x : Finset α // disjoint x ∧ nobot x }
+  { 𝒯 : Finset α // disjoint 𝒯 ∧ nobot 𝒯 }
 -- ANCHOR_END: Mesh
 
 theorem disjoint_subset {s t : Finset α} (h : t ⊆ s) (hd : disjoint s) : disjoint t :=
@@ -45,14 +45,14 @@ instance [DecidableEq α]: Inter (Mesh α) := ⟨fun a b => ⟨(a : Finset α) �
 def Mesh.card (m : Mesh α) : ℕ := (m : Finset α).card
 
 -- ANCHOR: partitions
-def partitions (T : Mesh α) (t : α) : Prop :=
-  Finset.sup T id = t
+def partitions (𝒯 : Mesh α) (S : α) : Prop :=
+  Finset.sup 𝒯 id = S
 infix:50 " ↪ " => partitions
 -- ANCHOR_END: partitions
 
 -- ANCHOR: refines
-def refines (A B : Mesh α) : Prop :=
-  ∀ t ∈ B, ∃ M ⊆ A, M ↪ t
+def refines (𝒯' 𝒯 : Mesh α) : Prop :=
+  ∀ T ∈ 𝒯, ∃ ℳ ⊆ 𝒯', ℳ ↪ T
 -- ANCHOR_END: refines
 
 -- instance : PartialOrder (Mesh α) where
@@ -213,6 +213,7 @@ theorem refines_antisymm [DecidableEq α] (A B : Mesh α) (hAB: refines A B) (hB
   apply Finset.Subset.antisymm_iff.mpr
   exact ⟨refines_antisymm_subset A B hAB hBA, refines_antisymm_subset B A hBA hAB⟩
 
+-- ANCHOR: Mesh_partialorder
 instance : LE (Mesh α) := ⟨refines⟩
 instance : LT (Mesh α) := ⟨fun f g => f ≤ g ∧ f ≠ g⟩
 
@@ -232,7 +233,8 @@ instance Mesh.partialOrder [DecidableEq α]: PartialOrder (Mesh α) where
       refine ⟨h.1, ?_⟩
       by_contra h₂
       rw [← h₂] at h
-      exact (and_not_self_iff (a ≤ a)).mp h
+      rcases h with ⟨hc₁, hc₂⟩
+      contradiction
   le_refl M t h := by
     use (singletonMesh t (mesh_mem_not_bot h))
     constructor
@@ -240,6 +242,7 @@ instance Mesh.partialOrder [DecidableEq α]: PartialOrder (Mesh α) where
     · unfold partitions
       simp only [Finset.sup_singleton, id_eq]
   le_trans := refines_trans
+-- ANCHOR_END: Mesh_partialorder
 
 -- ANCHOR: Mesh_Set_Example
 def real_line_singleton_mesh : Mesh (Set ℝ) :=
@@ -256,5 +259,6 @@ def real_line_singleton_mesh : Mesh (Set ℝ) :=
 
 -- ANCHOR: Mesh_Classical
 open Classical
-noncomputable def example_union := real_line_singleton_mesh ∩ real_line_singleton_mesh
+noncomputable def example_union :=
+  real_line_singleton_mesh ∩ real_line_singleton_mesh
 -- ANCHOR_END: Mesh_Classical

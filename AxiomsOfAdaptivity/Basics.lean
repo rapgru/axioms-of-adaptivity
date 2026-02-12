@@ -16,11 +16,11 @@ variable {β : Type*}
 -- ANCHOR_END: beta
 
 -- ANCHOR: gη2
-def gη2 (ri: RefinementIndicator α β) (triang: Mesh α) v :=
-  ∑ t ∈ triang, (ri triang v t)^2
+def gη2 (ri: RefinementIndicator α β) (𝒯: Mesh α) v :=
+  ∑ T ∈ 𝒯, (ri 𝒯 v T)^2
 -- ANCHOR_END: gη2
 
-theorem gη2_nonneg (ri: RefinementIndicator α β) (triang: Mesh α) v : 0 ≤ gη2 ri triang v := by
+theorem gη2_nonneg (ri: RefinementIndicator α β) (𝒯: Mesh α) v : 0 ≤ gη2 ri 𝒯 v := by
   apply sum_nonneg
   exact fun _ _ ↦ sq_nonneg _
 
@@ -144,10 +144,13 @@ def ρ_est δ := (1+δ) * (1 - (1 - alg.ρ_red) * alg.θ)
 noncomputable def C_est δ := alg.C_red + (1 + δ⁻¹) * alg.C_stab ^ 2
 -- ANCHOR_END: lemma47_consts
 
+-- ANCHOR: AdaptiveAlgorithm_redefs
 -- redefinitions for general field access
 def C_rel := C_rel' alg.C_Δ alg.C_drel
 noncomputable def ε_qos := ε_qos' alg.ρ_red alg.C_rel alg.C_red alg.C_stab alg.θ
-lemma reliability : ∀ T, alg.d T alg.u (alg.U T) ≤ alg.C_rel * √(gη2 alg.η T (alg.U T)) := alg.reliability'
+lemma reliability : ∀ T, alg.d T alg.u (alg.U T) ≤ alg.C_rel * √(gη2 alg.η T (alg.U T)) :=
+  alg.reliability'
+-- ANCHOR_END: AdaptiveAlgorithm_redefs
 
 -- ANCHOR: seq_abbrev
 def gη2_seq l := gη2 alg.η (alg.𝒯 <| l) (alg.U <| alg.𝒯 <| l)
@@ -257,11 +260,11 @@ lemma doerfler_for_refined_elements :
       ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by
   intros l
   calc alg.θ * gη2_seq alg l
-    _ ≤ ∑ t ∈ alg.ℳ l, alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by exact (alg.hℳ l).2.1
+    _ ≤ ∑ t ∈ alg.ℳ l, alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := (alg.hℳ l).2.1
     _ ≤ ∑ t ∈ (alg.𝒯 l \ alg.𝒯 (l+1)), alg.η (alg.𝒯 l) (alg.U <| alg.𝒯 l) t ^ 2 := by
-      apply Finset.sum_le_sum_of_subset_of_nonneg
-      · exact (alg.hℳ l).1
-      · exact fun _ _ _ ↦ sq_nonneg _
+      apply Finset.sum_le_sum_of_subset_of_nonneg (alg.hℳ l).1
+      intros
+      apply sq_nonneg
 -- ANCHOR_END: doerfler_for_refined_elements
 
 -- ρ_est is linear, positive rate is the key to monotonicity

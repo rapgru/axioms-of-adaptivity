@@ -4,10 +4,12 @@ open Finset
 
 -- ANCHOR: summability_defs
 def uniform_summability (a : ℕ → NNReal) :=
-  Summable (a^2) ∧ ∃ C > 0, ∀ l : ℕ, ∑' k, (a^2) (k + l + 1) ≤ C * (a^2) l
+  Summable (a^2)
+  ∧ ∃ C > 0, ∀ l : ℕ, ∑' k, (a^2) (k + l + 1) ≤ C * (a^2) l
 
 def inverse_summability (a : ℕ → NNReal) :=
-  ∀ s : ℝ, s > 0 → ∃ C > 0, ∀ l : ℕ, ∑ k ∈ range l, (a k)^(-1/s) ≤ C * (a l)^(-1/s)
+  ∀ s : ℝ, s > 0 →
+    ∃ C > 0, ∀ l : ℕ, ∑ k ∈ range l, (a k)^(-1/s) ≤ C * (a l)^(-1/s)
 
 def uniform_r_linear_convergence (a : ℕ → NNReal) :=
   ∃ q ∈ (Set.Ioo 0 1), ∃ C > 0, ∀ k, ∀ l,
